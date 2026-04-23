@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComradeBite - Manage Groups & Meals</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Montserrat:wght@900&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-body: #080c14; --bg-card: rgba(30, 41, 59, 0.85); --bg-drawer: #1e293b; --text-main: #f8fafc; --text-muted: #94a3b8; --cyan-accent: #22d3ee; --emerald-accent: #10b981; --danger: #f43f5e; --glass-border: rgba(255, 255, 255, 0.1); }
+        [data-theme="light"] { --bg-body: #f1f5f9; --bg-card: rgba(255, 255, 255, 0.8); --bg-drawer: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --cyan-accent: #0891b2; --emerald-accent: #059669; --white: #000000; --glass-border: rgba(0, 0, 0, 0.1); }
+        * { box-sizing: border-box; font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; }
+        body { margin: 0; background: var(--bg-body); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
+        .top-bar { background: var(--bg-drawer); padding: 15px 20px; display: flex; align-items: center; gap: 15px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--glass-border); }
+        .logo-text { font-family: 'Montserrat'; font-weight: 900; font-size: 24px; color: var(--text-main); }
+        .logo-bite { color: var(--cyan-accent); }
+        .drawer { position: fixed; left: -300px; width: 280px; height: 100%; background: var(--bg-drawer); transition: 0.3s ease; z-index: 1000; padding: 40px 20px; border-right: 1px solid var(--glass-border); }
+        .drawer.active { left: 0; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 900; display: none; backdrop-filter: blur(4px); }
+        .drawer-overlay.active { display: block; }
+        .nav-item { padding: 15px; border-radius: 12px; cursor: pointer; color: var(--text-muted); font-weight: 600; margin-bottom: 8px; }
+        .nav-item.active { background: var(--cyan-accent); color: #000; }
+        .app-container { width: 100%; max-width: 500px; padding: 20px; box-sizing: border-box; margin: 0 auto; }
+        .card { background: var(--bg-card); border-radius: 20px; padding: 22px; margin-bottom: 25px; border: 1px solid var(--glass-border); backdrop-filter: blur(12px); }
+        .card-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        #sentiment-box { background: rgba(255, 255, 255, 0.12); border-left: 6px solid var(--cyan-accent); padding: 20px; margin-bottom: 25px; border-radius: 15px; font-style: italic; }
+        .people-counter { display: flex; align-items: center; background: var(--bg-drawer); padding: 8px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--glass-border); }
+        .counter-btn { width: 40px; height: 40px; border-radius: 8px; background: var(--cyan-accent); color: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; font-weight: bold; }
+        .counter-val { flex: 1; text-align: center; font-weight: bold; font-size: 20px; color: var(--cyan-accent); }
+        input, select { width: 100%; padding: 14px; margin-bottom: 15px; background: #0f172a; border: 1px solid var(--glass-border); border-radius: 12px; color: #fff; outline: none; }
+        button { width: 100%; padding: 16px; background: var(--cyan-accent); border: none; border-radius: 12px; font-weight: 800; cursor: pointer; text-transform: uppercase; color: #000; }
+        button.secondary { background: transparent; border: 1px solid var(--cyan-accent); color: var(--cyan-accent); }
+        .chip { display: inline-block; padding: 10px 18px; background: #334155; border-radius: 20px; margin: 5px; cursor: pointer; font-size: 14px; color: var(--text-muted); }
+        .chip.selected { background: var(--cyan-accent); color: #000; font-weight: 700; }
+        .plan-slot { background: rgba(0,0,0,0.2); padding: 18px; border-radius: 18px; margin-top: 15px; border-left: 4px solid var(--cyan-accent); }
+        #auth-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.98); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(10px); }
+        .auth-card { background: #1e293b; padding: 40px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center; }
+        .mode-link { color: var(--cyan-accent); cursor: pointer; text-decoration: underline; font-size: 14px; display: inline-block; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <div class="logo-text" style="font-size: 32px; margin-bottom: 20px;">Comrade<span>Bite</span></div>
+            <div id="auth-view">
+                <p id="auth-desc" style="color: #94a3b8; margin-bottom: 20px;">Join to start planning meals with your roommates.</p>
+                <input type="email" id="email" placeholder="Email">
+                <input type="password" id="password" placeholder="Password">
+                <button id="auth-btn" onclick="handleAuth()">Register</button>
+                <p style="margin-top: 20px; font-size: 14px; color: var(--cyan-accent); cursor: pointer;" onclick="toggleAuth()" id="auth-toggle">login instead if you have an account</p>
+            </div>
+            <p id="error" style="color: var(--danger); margin-top: 15px; font-size: 12px;"></p>
+        </div>
+    </div>
+
+    <div class="drawer-overlay" id="overlay" onclick="toggleDrawer()"></div>
+    <div class="drawer" id="drawer">
+        <div class="logo-text" style="margin-bottom: 30px;">Comrade<span class="logo-bite">Bite</span></div>
+        <div class="nav-item active" onclick="switchSection('dashboard')">Home Dashboard</div>
+        <div class="nav-item" onclick="switchSection('group')">Group Management</div>
+        <div class="nav-item" onclick="switchSection('inventory')">Meal Inventory</div>
+        <div class="nav-item" onclick="switchSection('combos')">Combo Builder</div>
+        <hr style="opacity: 0.1; margin: 20px 0;">
+        <button class="secondary" onclick="firebase.auth().signOut()">Logout</button>
+    </div>
+
+    <div class="top-bar">
+        <div onclick="toggleDrawer()" style="cursor:pointer; font-size: 24px;">☰</div>
+        <div class="logo-text" style="flex: 1;">Comrade<span class="logo-bite">Bite</span></div>
+        <div id="active-group-header" style="background: rgba(34, 211, 238, 0.1); color: var(--cyan-accent); padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 800;">No Group</div>
+    </div>
+
+    <div class="app-container">
+        <!-- Group Management -->
+        <div id="section-group" class="section" style="display:none">
+            <div class="card">
+                <div class="card-title">Create a Group</div>
+                <p style="color: #94a3b8; font-size: 13px; margin-bottom: 10px;">The primary function of ComradeBite is collaborating. Create your first group here.</p>
+                <input id="new-group-name" placeholder="Group Name">
+                <button onclick="createGroup()">Create New Group</button>
+            </div>
+            <div class="card">
+                <div class="card-title">Join a Group</div>
+                <p style="color: #94a3b8; font-size: 13px; margin-bottom: 10px;">Enter the code shared by a friend.</p>
+                <input id="join-code" placeholder="6-Digit Code">
+                <button onclick="joinGroup()" class="secondary">Join with Code</button>
+            </div>
+            <div id="group-list"></div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="section-dashboard" class="section">
+            <div id="sentiment-box">"A hungry comrade is a weary comrade. Fuel up!"</div>
+            <div class="people-counter">
+                <div class="counter-btn" onclick="changeGS(-1)">−</div>
+                <div class="counter-val" id="gs-val">1</div>
+                <div class="counter-btn" onclick="changeGS(1)">+</div>
+            </div>
+            <div id="daily-plan"></div>
+        </div>
+
+        <!-- Inventory -->
+        <div id="section-inventory" class="section" style="display:none">
+            <div class="card">
+                <div class="card-title">Add Ingredient</div>
+                <input id="inv-name" placeholder="Item Name">
+                <input id="inv-price" type="number" placeholder="Total Price">
+                <input id="inv-pax" type="number" placeholder="Serves">
+                <button onclick="addInv()">Save to Cloud</button>
+            </div>
+            <div id="inventory-list"></div>
+        </div>
+
+        <!-- Combos -->
+        <div id="section-combos" class="section" style="display:none">
+            <div class="card">
+                <div class="card-title">Build Meal</div>
+                <div id="ingredient-chips"></div>
+                <input id="co-name" placeholder="Meal Name">
+                <select id="co-time"><option>Breakfast</option><option>Lunch</option><option>Dinner</option></select>
+                <button onclick="addCombo()">Save Combo</button>
+            </div>
+            <div id="combo-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const cfg = { apiKey: "AIzaSyDzzNgX8oEq_pmLJwUk1MJ3404eaDl7Ge4", authDomain: "comradebite-c0265c98.firebaseapp.com", databaseURL: "https://comradebite-c0265c98-default-rtdb.firebaseio.com", projectId: "comradebite-c0265c98" };
+        firebase.initializeApp(cfg);
+        const db = firebase.database(), auth = firebase.auth();
+        let user = null, curCode = "", data = { inventory: {}, meals: {}, groupSize: 1 }, selectedIngs = new Set();
+        let isLogin = false;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.get('mode') === 'login') toggleAuth();
+
+        auth.onAuthStateChanged(u => { if(u) { user = u; document.getElementById('auth-overlay').style.display='none'; loadUser(); } else { document.getElementById('auth-overlay').style.display='flex'; } });
+
+        function toggleAuth() { isLogin = !isLogin; document.getElementById('auth-btn').innerText = isLogin ? "Login" : "Register"; document.getElementById('auth-desc').innerText = isLogin ? "Welcome back, Comrade." : "Join to start planning meals."; document.getElementById('auth-toggle').innerText = isLogin ? "register instead if you don't have an account" : "login instead if you have an account"; }
+        async function handleAuth() {
+            const e = document.getElementById('email').value, p = document.getElementById('password').value;
+            try { if(isLogin) await auth.signInWithEmailAndPassword(e, p); else await auth.createUserWithEmailAndPassword(e, p); }
+            catch(err) { document.getElementById('error').innerText = err.message; }
+        }
+
+        function loadUser() { db.ref(`users/${user.uid}/groups`).on('value', s => { const g = s.val(); if(g) { curCode = Object.keys(g)[0]; syncGroup(); } else switchSection('group'); }); }
+        function syncGroup() {
+            if(!curCode) return;
+            db.ref(`groups/${curCode}`).on('value', s => {
+                const v = s.val() || {};
+                data = { inventory: v.inventory || {}, meals: v.meals || {}, name: v.name || "None", groupSize: v.groupSize || 1 };
+                document.getElementById('active-group-header').innerText = data.name;
+                document.getElementById('gs-val').innerText = data.groupSize;
+                renderDash(); renderInv(); renderCombos();
+            });
+        }
+
+        function switchSection(id) { document.querySelectorAll('.section').forEach(s => s.style.display='none'); document.getElementById('section-'+id).style.display='block'; document.getElementById('drawer').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); }
+        function createGroup() {
+            const n = document.getElementById('new-group-name').value; if(!n) return;
+            const c = Math.random().toString(36).substring(2, 8).toUpperCase();
+            db.ref(`groups/${c}`).set({ name: n, owner: user.uid, members: { [user.uid]: true }, groupSize: 1 });
+            db.ref(`users/${user.uid}/groups/${c}`).set({ name: n }).then(() => switchSection('dashboard'));
+        }
+        function joinGroup() {
+            const c = document.getElementById('join-code').value.toUpperCase();
+            db.ref(`groups/${c}`).once('value', s => { if(s.exists()) { db.ref(`groups/${c}/members/${user.uid}`).set(true); db.ref(`users/${user.uid}/groups/${c}`).set({ name: s.val().name }).then(() => switchSection('dashboard')); } });
+        }
+        function changeGS(d) { db.ref(`groups/${curCode}/groupSize`).set(Math.max(1, data.groupSize + d)); }
+        function addInv() { const n = document.getElementById('inv-name').value, p = document.getElementById('inv-price').value, s = document.getElementById('inv-pax').value; if(n && p && s) db.ref(`groups/${curCode}/inventory`).push({ name: n, totalPrice: parseFloat(p), numPeople: parseInt(s) }); }
+        function addCombo() { const n = document.getElementById('co-name').value, t = document.getElementById('co-time').value; if(n && selectedIngs.size) db.ref(`groups/${curCode}/meals`).push({ name: n, baseNames: Array.from(selectedIngs), targetTime: t }); }
+        function renderDash() {
+            const cont = document.getElementById('daily-plan'); cont.innerHTML = "<h3>Daily Plan</h3>";
+            ["Breakfast", "Lunch", "Dinner"].forEach(t => {
+                const meals = Object.values(data.meals).filter(m => m.targetTime === t);
+                const m = meals[Math.floor(Math.random() * meals.length)];
+                let cost = 0; if(m) m.baseNames.forEach(n => { const it = Object.values(data.inventory).find(i => i.name === n); if(it) cost += (it.totalPrice / it.numPeople) * data.groupSize; });
+                cont.innerHTML += `<div class="plan-slot"><div class="slot-time">${t}</div><b>${m ? m.name : 'No meal set'}</b><br><small>Total Cost: KSh ${Math.round(cost)}</small></div>`;
+            });
+        }
+        function renderInv() { const l = document.getElementById('inventory-list'); l.innerHTML = ""; Object.entries(data.inventory).forEach(([k,v]) => { l.innerHTML += `<div class="card"><b>${v.name}</b><br><small>KSh ${v.totalPrice} serves ${v.numPeople}</small></div>`; }); }
+        function renderCombos() {
+            const chips = document.getElementById('ingredient-chips'); chips.innerHTML = "";
+            const unique = [...new Set(Object.values(data.inventory).map(x => x.name))];
+            unique.forEach(n => { const c = document.createElement('div'); c.className = `chip ${selectedIngs.has(n)?'selected':''}`; c.innerText = n; c.onclick = () => { selectedIngs.has(n)?selectedIngs.delete(n):selectedIngs.add(n); renderCombos(); }; chips.appendChild(c); });
+            const list = document.getElementById('combo-list'); list.innerHTML = "";
+            Object.entries(data.meals).forEach(([k,v]) => { list.innerHTML += `<div class="card"><b>${v.name}</b><br><small>${v.targetTime} • ${v.baseNames.join(' + ')}</small></div>`; });
+        }
+        function toggleDrawer() { document.getElementById('drawer').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+    </script>
+</body>
+</html>
