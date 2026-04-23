@@ -327,6 +327,7 @@ class MealViewModel(
     }
 
     fun setGroupSize(s: Int) { _groupSize.value = s.coerceIn(1, MAX_GROUP_SIZE) }
+    fun setBudget(b: Double?) { _budgetPerPerson.value = b }
     fun toggleTheme() {
         val n = !_isDarkTheme.value
         _isDarkTheme.value = n

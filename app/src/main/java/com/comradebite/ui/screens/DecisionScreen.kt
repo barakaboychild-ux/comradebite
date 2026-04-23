@@ -43,7 +43,8 @@ fun DecisionScreen(viewModel: MealViewModel) {
             value = budgetStr,
             onValueChange = { 
                 budgetStr = it
-                viewModel.setBudget(it.toDoubleOrNull())
+                viewModel.
+                setBudget(it.toDoubleOrNull())
             },
             label = { Text("Budget per person (KSh)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
