@@ -1,0 +1,25 @@
+# Ignore Firebase app folder
+public/
+
+# Ignore Android source code and build files
+app/
+gradle/
+.gradle/
+.idea/
+build/
+.firebase/
+.kotlin/
+
+# Ignore build scripts
+build.gradle.kts
+settings.gradle.kts
+gradle.properties
+local.properties
+gradlew
+gradlew.bat
+
+# Ignore other files
+simulator.html
+comradebite.html
+.firebaserc
+firebase.json

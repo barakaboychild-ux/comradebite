@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ComradeBite - Student Meal Planning & Collaboration</title>
+    <title>ComradeBite - Master Your Student Budget</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Montserrat:wght@900&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #080c14; --card: rgba(30, 41, 59, 0.85); --accent: #22d3ee; --text: #f8fafc; --muted: #94a3b8; }
@@ -18,10 +18,10 @@
         h1 { font-family: 'Montserrat'; font-size: 48px; margin-bottom: 10px; }
         .tagline { color: var(--accent); font-weight: 800; font-size: 20px; margin-bottom: 30px; text-transform: uppercase; }
 
-        /* Primary Goal Section */
-        .goal-section { background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(30, 41, 59, 0.8)); padding: 40px; border-radius: 30px; border: 2px solid var(--accent); margin-bottom: 50px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-        .goal-section h2 { font-family: 'Montserrat'; font-size: 32px; margin-top: 0; color: var(--text); }
-        .goal-section p { font-size: 18px; line-height: 1.6; color: var(--text); margin-bottom: 25px; }
+        /* Group Creation Section - The Primary Function Highlight */
+        .group-section { background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(30, 41, 59, 0.8)); padding: 40px; border-radius: 30px; border: 2px solid var(--accent); margin-bottom: 50px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .group-section h2 { font-family: 'Montserrat'; font-size: 32px; margin-top: 0; color: var(--text); }
+        .group-section p { font-size: 18px; line-height: 1.6; color: var(--text); margin-bottom: 25px; }
 
         .description { font-size: 16px; line-height: 1.6; color: var(--muted); margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto; }
 
@@ -50,16 +50,18 @@
 
     <div class="top-bar">
         <a href="#" class="logo">Comrade<span>Bite</span></a>
+        <!-- Login button redirects IMMEDIATELY to ComradeBite functional site -->
         <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/?mode=login'" style="background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">Login</button>
     </div>
 
     <div class="container">
         <!-- THE PRIMARY FUNCTION HIGHLIGHT -->
-        <div class="goal-section">
+        <div class="group-section">
             <h2>Collaborate with Roommates</h2>
             <p>The core of ComradeBite is <b>Group Planning</b>. Register to create your shared workspace where you can sync meal plans, track inventory, and split budgets with your comrades in real-time.</p>
+            <!-- Register button redirects IMMEDIATELY to ComradeBite functional site -->
             <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/?mode=register'" class="btn btn-primary" style="margin-bottom: 0;">Register to Create a Group</button>
-            <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/?mode=login'" class="login-link">login instead if you have an account</button>
+            <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/?mode=login'" class="login-link">login instead if you have the account instead</button>
         </div>
 
         <h1>Comrade<span>Bite</span></h1>
@@ -76,7 +78,7 @@
                 <p>Track every ingredient you own and its cost per serving. Avoid overbuying at the market.</p>
             </div>
             <div class="feature-card">
-                <b>🤝 Live Sync</b>
+                <b>🤝 Group Sync</b>
                 <p>One group code connects everyone. Collaborative meal management made effortless.</p>
             </div>
             <div class="feature-card">
@@ -84,7 +86,7 @@
                 <p>Get automatic meal suggestions based on your remaining budget and ingredient variety.</p>
             </div>
             <div class="feature-card">
-                <b>🛒 Grocery Assistant</b>
+                <b>🛒 Smart Grocery</b>
                 <p>Automatically generate shopping lists based on your planned meals for the week.</p>
             </div>
         </div>
@@ -93,20 +95,20 @@
         <div class="manual-section">
             <h2>User Manual & App Guide</h2>
             <div class="manual-step">
-                <b>Step 1: Register Your Account</b>
+                <b>1. Start Your Journey (Register)</b>
                 <p>First, click the **Register** button to create your secure profile. Registration is necessary to save your data and enable collaboration features.</p>
             </div>
             <div class="manual-step">
-                <b>Step 2: Setup Your First Group</b>
-                <p>Once logged in to the ComradeBite site, use the 'Group Management' tab to **Create a Group**. You will get a unique 6-digit code.</p>
+                <b>2. Setup Your Inventory</b>
+                <p>Add ingredients to your 'Meal Inventory'. Add prices and serving sizes—our algorithm uses this to keep you on budget!</p>
             </div>
             <div class="manual-step">
-                <b>Step 3: Sync with Roommates</b>
-                <p>Share your Group Code with your roommates. They can join your group to see the shared inventory and plan.</p>
+                <b>3. Build Combinations</b>
+                <p>Use the 'Combo Builder' to combine inventory items into actual meals (e.g., Rice + Beans). Assign them a category: Breakfast, Lunch, or Dinner.</p>
             </div>
             <div class="manual-step">
-                <b>Step 4: Build Your Menu</b>
-                <p>Add ingredients to your 'Meal Inventory' and combine them into meals using the 'Combo Builder'. The app will take care of the math!</p>
+                <b>4. Collaborate with Comrades</b>
+                <p>Once registered, use the 'Group Management' tab to **Create a Group**. Share the 6-digit code with your roommates so everyone can see the shared inventory and plan.</p>
             </div>
         </div>
 
