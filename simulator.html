@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComradeBite Simulator v5.2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Montserrat:wght@900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            /* Dark Theme (Default) */
+            --bg-body: #080c14;
+            --bg-card: rgba(30, 41, 59, 0.85);
+            --bg-drawer: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --slate-700: #334155;
+            --cyan-accent: #22d3ee;
+            --emerald-accent: #10b981;
+            --logo-gradient: linear-gradient(135deg, #22d3ee 0%, #10b981 100%);
+            --danger: #f43f5e;
+            --white: #ffffff;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="light"] {
+            --bg-body: #f1f5f9;
+            --bg-card: rgba(255, 255, 255, 0.8);
+            --bg-drawer: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --slate-700: #cbd5e1;
+            --cyan-accent: #0891b2;
+            --emerald-accent: #059669;
+            --logo-gradient: linear-gradient(135deg, #0891b2 0%, #059669 100%);
+            --danger: #e11d48;
+            --white: #000000;
+            --glass-border: rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg-body);
+            color: var(--text-main);
+            overflow-x: hidden;
+            background-image: url('file:///C:/Users/barak/.gemini/antigravity/brain/73ee8cf5-a9ef-43bd-9892-4174a1a7c0e7/app_background_food_1772815340815.png');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+        }
+
+        /* Logo Styling */
+        .logo-text {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 26px;
+            letter-spacing: -0.5px;
+            color: var(--white);
+            display: inline-block;
+            line-height: 1;
+        }
+
+        .logo-bite {
+            color: var(--cyan-accent);
+            opacity: 1;
+            font-weight: 900;
+        }
+
+        /* Glassmorphism */
+        .section,
+        .day-section,
+        .drawer,
+        .meal-card {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border) !important;
+        }
+
+        .top-bar {
+            background: var(--bg-drawer);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--slate-700);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 300px;
+            height: 100%;
+            background: var(--bg-drawer);
+            z-index: 1000;
+            transition: 0.3s ease;
+            padding: 40px 20px;
+        }
+
+        .drawer.active {
+            left: 0;
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .nav-item {
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 5px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .nav-item.active {
+            background: var(--cyan-accent);
+            color: #000;
+            font-weight: 700;
+        }
+
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 900;
+            display: none;
+        }
+
+        .drawer-overlay.active {
+            display: block;
+        }
+
+        .content {
+            padding: 25px;
+            max-width: 500px;
+            margin: 0 auto;
+            min-height: calc(100vh - 70px);
+        }
+
+        .section {
+            display: none;
+            padding: 0;
+            background: transparent;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .day-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 22px;
+            margin-bottom: 25px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .day-header {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--white);
+            text-transform: none;
+            letter-spacing: 0.5px;
+            margin-bottom: 15px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        .people-counter {
+            display: flex;
+            align-items: center;
+            background: var(--bg-drawer);
+            padding: 8px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 1px solid var(--slate-700);
+        }
+
+        .counter-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: var(--slate-700);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        .counter-val {
+            flex: 1;
+            text-align: center;
+            font-weight: bold;
+            font-size: 20px;
+            color: var(--cyan-accent);
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 15px;
+            background: var(--bg-drawer);
+            border: 1px solid var(--slate-700);
+            border-radius: 12px;
+            color: var(--text-main);
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            background: var(--cyan-accent);
+            border: none;
+            border-radius: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            color: #000;
+            text-transform: uppercase;
+        }
+
+        button.outline {
+            background: transparent;
+            border: 1px solid var(--cyan-accent);
+            color: var(--cyan-accent);
+            padding: 8px 15px;
+            width: auto;
+            font-size: 12px;
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 10px 18px;
+            background: var(--slate-700);
+            border-radius: 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .chip.selected {
+            background: var(--cyan-accent);
+            color: #000;
+            font-weight: 700;
+        }
+
+        .meal-card {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 10px;
+        }
+
+        /* Sentiment Box */
+        #sentiment-box {
+            background: rgba(255, 255, 255, 0.12);
+            border-left: 6px solid var(--cyan-accent);
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 15px;
+            font-style: italic;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 500;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Theme Toggle Switch */
+        .theme-switch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--slate-700);
+            padding-top: 20px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 22px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--slate-700);
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--cyan-accent);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(22px);
+        }
+
+        .math-breakdown {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        .bottom-tag {
+            position: absolute;
+            bottom: 30px;
+            left: 25px;
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="drawer-overlay" id="overlay" onclick="toggleDrawer()"></div>
+
+    <div class="drawer" id="drawer">
+        <div class="logo-text" style="font-size: 32px; margin-bottom: 30px;">Comrade<span class="logo-bite">Bite</span>
+        </div>
+        <div class="nav-item active" id="nav-dashboard" onclick="switchSection('dashboard')">Home Dashboard</div>
+        <div class="nav-item" id="nav-items" onclick="switchSection('items')">Meal Inventory</div>
+        <div class="nav-item" id="nav-combos" onclick="switchSection('combos')">Combo Builder</div>
+        <div class="nav-item" id="nav-decide" onclick="switchSection('decide')">Smart Decisions</div>
+        <div class="nav-item" id="nav-grocery" onclick="switchSection('grocery')">Grocery Assistant</div>
+
+        <div class="theme-switch">
+            <span>Dark</span>
+            <label class="switch">
+                <input type="checkbox" id="theme-toggle" onchange="toggleTheme()">
+                <span class="slider"></span>
+            </label>
+            <span>Light</span>
+        </div>
+
+        <div class="bottom-tag">COMRADEBITE 5.1</div>
+    </div>
+
+    <div class="top-bar">
+        <div class="menu-icon" onclick="toggleDrawer()">☰</div>
+        <div class="logo-text" style="flex: 1;">Comrade<span class="logo-bite">Bite</span> <small
+                style="font-size: 10px; opacity: 0.5; -webkit-text-fill-color: var(--text-muted); text-transform: none;">v5.6</small>
+        </div>
+    </div>
+
+    <!-- Background Scrim for Visibility -->
+    <div
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.5)); z-index: -1;">
+    </div>
+
+    <div class="content">
+        <!-- Dashboard -->
+        <div id="section-dashboard" class="section active">
+            <div id="sentiment-box">"A hungry comrade is a weary comrade. Fuel up for excellence!"</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div class="day-header" style="margin-bottom: 0;">Daily Plan</div>
+                <div style="display: flex; gap: 10px;">
+                    <label
+                        style="display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--danger); cursor: pointer;">
+                        <input type="checkbox" id="emergency-mode" onchange="render()"> Emergency Mode (Budget < 50)
+                            </label>
+                            <button class="outline" onclick="refreshSuggestions()">Refresh Choices</button>
+                </div>
+            </div>
+            <div class="people-counter">
+                <div class="counter-btn" onclick="changeGlobalPeople(-1)">−</div>
+                <div class="counter-val" id="global-people-val">1</div>
+                <div class="counter-btn" onclick="changeGlobalPeople(1)">+</div>
+            </div>
+
+            <div id="dashboard-slots">
+                <div class="day-section">
+                    <div class="day-header">Breakfast</div>
+                    <div id="breakfast-slot"></div>
+                </div>
+                <div class="day-section" style="border-left-color: var(--cyan-accent);">
+                    <div class="day-header" style="color: var(--cyan-accent);">Lunch</div>
+                    <div id="lunch-slot"></div>
+                </div>
+                <div class="day-section" style="border-left-color: #FACC15;">
+                    <div class="day-header" style="color: #FACC15;">Dinner</div>
+                    <div id="dinner-slot"></div>
+                </div>
+            </div>
+
+            <div id="eaten-summary" style="margin-top: 25px;"></div>
+        </div>
+
+        <!-- Inventory -->
+        <div id="section-items" class="section">
+            <div id="item-editor">
+                <div id="editor-status"
+                    style="font-size: 11px; color: var(--cyan-accent); margin-bottom: 5px; font-weight: bold; display: none;">
+                    EDITING ITEM...</div>
+                <label>Item Name</label><input type="text" id="base-name" placeholder="e.g. Rice, Beans">
+                <label>Total Market Price (KSh)</label><input type="number" id="base-price" placeholder="0.00">
+                <label>Serves how many people?</label><input type="number" id="base-people" value="1" min="1">
+                <button id="save-item-btn" onclick="addBaseMeal()">Save Item</button>
+                <button id="cancel-edit-btn" class="outline" style="margin-top: 10px; display: none; width: 100%;"
+                    onclick="resetEditor()">Cancel Edit</button>
+                <input type="hidden" id="editing-id" value="">
+            </div>
+            <div style="margin-top: 30px;" id="base-meal-list"></div>
+        </div>
+
+        <!-- Combos -->
+        <div id="section-combos" class="section">
+            <label>Select items to combine:</label>
+            <div id="item-chips" style="margin-bottom: 20px;"></div>
+            <label>Combination Name</label><input type="text" id="combo-name" placeholder="Rice & Beans">
+            <label>Best served as:</label>
+            <select id="combo-time">
+                <option value="Breakfast">Breakfast</option>
+                <option value="Lunch">Lunch</option>
+                <option value="Dinner">Dinner</option>
+            </select>
+            <label>Nutrition Vibe:</label>
+            <select id="combo-vibe">
+                <option value="Normal">Normal</option>
+                <option value="Brain Power">🧠 Brain Power (Exam Week)</option>
+                <option value="Heavy">💪 Heavy (Lab Day)</option>
+                <option value="Energy">⚡ High Energy</option>
+            </select>
+            <button onclick="saveCombination()">Save Combination</button>
+            <div style="margin-top:30px" id="combo-list"></div>
+        </div>
+
+        <!-- Grocery -->
+        <div id="section-grocery" class="section">
+            <div class="day-header">Grocery Assistant</div>
+            <p style="font-size: 13px; color: var(--gray-400); margin-bottom: 20px;">Planning a big shop? Enter how many
+                times you want to eat each combo this week.</p>
+            <div id="grocery-plan-list"></div>
+            <button onclick="calculateGroceries()" style="margin-top: 20px;">Calculate Bulk Needs</button>
+            <div id="grocery-result" style="margin-top: 30px;"></div>
+        </div>
+
+        <!-- Decisions -->
+        <div id="section-decide" class="section">
+            <label>Budget Per Person (KSh)</label>
+            <input type="number" id="budget-input" placeholder="0.00" oninput="updateSuggestions()">
+            <label>Time Category:</label>
+            <select id="time-filter" onchange="updateSuggestions()">
+                <option value="Breakfast">Breakfast</option>
+                <option value="Lunch">Lunch</option>
+                <option value="Dinner">Dinner</option>
+            </select>
+            <div id="suggestion-container" style="margin-top: 25px;"></div>
+        </div>
+    </div>
+
+    <script>
+        let baseMeals = JSON.parse(localStorage.getItem('cb_v5_base') || '[]');
+        let combinations = JSON.parse(localStorage.getItem('cb_v5_combos') || '[]');
+        let eatenTodayIngredients = JSON.parse(localStorage.getItem('cb_v5_eaten_today') || '[]');
+        let currentDayPlan = JSON.parse(localStorage.getItem('cb_v5_plan') || '{}');
+        let selectedBaseNames = [];
+        let globalPeople = 1;
+
+        const sentiments = [
+            "A hungry comrade is a weary comrade. Fuel up for excellence!",
+            "Good food is the foundation of genuine happiness and grades!",
+            "Eat well today, lead better tomorrow. You've got this, Comrade!",
+            "Your brain needs fuel as much as your books. Don't skip a meal!",
+            "Sharing a meal is the ultimate bond. Enjoy your food together!",
+            "Success starts with a full stomach. Bon appétit!",
+            "You can't study on an empty stomach. Treat yourself to a good meal!"
+        ];
+
+        function toggleTheme() {
+            const isLight = document.getElementById('theme-toggle').checked;
+            document.body.setAttribute('data-theme', isLight ? 'light' : 'dark');
+            localStorage.setItem('cb_theme', isLight ? 'light' : 'dark');
+        }
+
+        // Initialize Theme
+        const savedTheme = localStorage.getItem('cb_theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.body.setAttribute('data-theme', savedTheme);
+        setTimeout(() => {
+            if (document.getElementById('theme-toggle')) {
+                document.getElementById('theme-toggle').checked = (savedTheme === 'light');
+            }
+        }, 100);
+
+        function rotateSentiment() {
+            const box = document.getElementById('sentiment-box');
+            if (box) {
+                box.innerText = `"${sentiments[Math.floor(Math.random() * sentiments.length)]}"`;
+            }
+        }
+        setInterval(rotateSentiment, 10000); // Rotate every 10s
+
+        const vibeIcons = {
+            "Normal": "",
+            "Brain Power": "🧠",
+            "Heavy": "💪",
+            "Energy": "⚡"
+        };
+
+        function toggleDrawer() {
+            document.getElementById('drawer').classList.toggle('active');
+            document.getElementById('overlay').classList.toggle('active');
+        }
+
+        function switchSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.getElementById('section-' + sectionId).classList.add('active');
+            document.getElementById('nav-' + sectionId).classList.add('active');
+            if (document.getElementById('drawer').classList.contains('active')) toggleDrawer();
+            render();
+        }
+
+        function changeGlobalPeople(delta) {
+            globalPeople = Math.max(1, globalPeople + delta);
+            document.getElementById('global-people-val').innerText = globalPeople;
+            render();
+        }
+
+        function addBaseMeal() {
+            const name = document.getElementById('base-name').value.trim();
+            const totalPrice = parseFloat(document.getElementById('base-price').value);
+            const numPeople = parseInt(document.getElementById('base-people').value) || 1;
+            const editingId = document.getElementById('editing-id').value;
+
+            if (name && !isNaN(totalPrice)) {
+                if (editingId) {
+                    const idx = baseMeals.findIndex(m => m.id == editingId);
+                    const oldPrice = baseMeals[idx].totalPrice;
+                    // Tracker: Store price history if changed
+                    if (oldPrice !== totalPrice) {
+                        if (!baseMeals[idx].history) baseMeals[idx].history = [];
+                        baseMeals[idx].history.push({ date: new Date().toLocaleDateString(), price: oldPrice });
+                    }
+                    baseMeals[idx] = { ...baseMeals[idx], name, totalPrice, numPeople, pricePerPerson: totalPrice / numPeople };
+                } else {
+                    baseMeals.push({ id: Date.now(), name, totalPrice, numPeople, pricePerPerson: totalPrice / numPeople, history: [] });
+                }
+                localStorage.setItem('cb_v5_base', JSON.stringify(baseMeals));
+                resetEditor();
+                render();
+            }
+        }
+
+        function editItem(id) {
+            const item = baseMeals.find(m => m.id == id);
+            if (item) {
+                document.getElementById('base-name').value = item.name;
+                document.getElementById('base-price').value = item.totalPrice;
+                document.getElementById('base-people').value = item.numPeople;
+                document.getElementById('editing-id').value = item.id;
+                document.getElementById('save-item-btn').innerText = "Update Item";
+                document.getElementById('editor-status').style.display = "block";
+                document.getElementById('cancel-edit-btn').style.display = "block";
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function deleteItem(id) {
+            if (confirm("Delete this variation?")) {
+                baseMeals = baseMeals.filter(m => m.id != id);
+                localStorage.setItem('cb_v5_base', JSON.stringify(baseMeals));
+                render();
+            }
+        }
+
+        function resetEditor() {
+            document.getElementById('base-name').value = '';
+            document.getElementById('base-price').value = '';
+            document.getElementById('base-people').value = '1';
+            document.getElementById('editing-id').value = '';
+            document.getElementById('save-item-btn').innerText = "Save Item";
+            document.getElementById('editor-status').style.display = "none";
+            document.getElementById('cancel-edit-btn').style.display = "none";
+        }
+
+        function saveCombination() {
+            const name = document.getElementById('combo-name').value.trim();
+            const time = document.getElementById('combo-time').value;
+            const vibe = document.getElementById('combo-vibe').value;
+            if (name && selectedBaseNames.length > 0) {
+                combinations.push({ id: Date.now(), name, baseNames: [...selectedBaseNames], targetTime: time, vibe, frequency: 0 });
+                localStorage.setItem('cb_v5_combos', JSON.stringify(combinations));
+                document.getElementById('combo-name').value = '';
+                selectedBaseNames = [];
+                render();
+            }
+        }
+
+        function getComboPricing(baseNames, personCount) {
+            let totalGroupCost = 0, totalPersonalCost = 0, missingItems = [], details = [];
+            if (!baseNames) return { totalGroupCost: 0, totalPersonalCost: 0, missingItems: [], details: [] };
+
+            baseNames.forEach(mealName => {
+                // Precise match for current group size
+                let match = baseMeals.find(m => m.name.toLowerCase() === mealName.toLowerCase() && m.numPeople === personCount);
+
+                // Fallback: Use any variation and scale (to avoid "terrible" failures)
+                if (!match) {
+                    match = baseMeals.find(m => m.name.toLowerCase() === mealName.toLowerCase());
+                    if (match) {
+                        const scaledPrice = match.pricePerPerson * personCount;
+                        details.push({ name: mealName, price: scaledPrice, isScaled: true, originalP: match.numPeople });
+                        totalGroupCost += scaledPrice;
+                        totalPersonalCost += match.pricePerPerson;
+                    } else {
+                        missingItems.push(mealName);
+                    }
+                } else {
+                    details.push({ name: mealName, price: match.totalPrice, isScaled: false });
+                    totalGroupCost += match.totalPrice;
+                    totalPersonalCost += match.pricePerPerson;
+                }
+            });
+            return { totalGroupCost, totalPersonalCost, missingItems, details };
+        }
+
+        function calculateGroceries() {
+            const inputs = document.querySelectorAll('.grocery-input');
+            let bulkSum = {};
+            inputs.forEach(input => {
+                const count = parseInt(input.value) || 0;
+                if (count > 0) {
+                    const comboId = input.dataset.id;
+                    const combo = combinations.find(c => c.id == comboId);
+                    combo.baseNames.forEach(name => {
+                        const norm = name.toLowerCase();
+                        if (!bulkSum[norm]) bulkSum[norm] = 0;
+                        bulkSum[norm] += count;
+                    });
+                }
+            });
+
+            const resDiv = document.getElementById('grocery-result');
+            if (Object.keys(bulkSum).length === 0) {
+                resDiv.innerHTML = '<p style="color:var(--danger)">Enter some counts first!</p>';
+                return;
+            }
+
+            let html = '<div class="day-header">BULK MARKET NEEDS</div><div class="card" style="padding:15px;">';
+            for (let name in bulkSum) {
+                // Find a variation to get rough unit price
+                const varItem = baseMeals.find(m => m.name.toLowerCase() === name);
+                const avgPrice = varItem ? varItem.pricePerPerson : 0;
+                html += `<div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span><b>${name.toUpperCase()}</b> (x${bulkSum[name]} servings)</span>
+                    <span style="color:var(--cyan-accent)">Est. KSh ${avgPrice * bulkSum[name]}</span>
+                </div>`;
+            }
+            html += '</div>';
+            resDiv.innerHTML = html;
+        }
+
+        function markEaten(type) {
+            const mealId = currentDayPlan[type];
+            const combo = combinations.find(c => c.id === mealId);
+            if (combo) {
+                combo.frequency++;
+                combo.baseNames.forEach(name => {
+                    const normalized = name.toLowerCase();
+                    if (!eatenTodayIngredients.includes(normalized)) eatenTodayIngredients.push(normalized);
+                });
+                localStorage.setItem('cb_v5_combos', JSON.stringify(combinations));
+                localStorage.setItem('cb_v5_eaten_today', JSON.stringify(eatenTodayIngredients));
+                render();
+            }
+        }
+
+        function resetDay() {
+            eatenTodayIngredients = [];
+            currentDayPlan = {};
+            localStorage.setItem('cb_v5_eaten_today', JSON.stringify(eatenTodayIngredients));
+            localStorage.setItem('cb_v5_plan', JSON.stringify(currentDayPlan));
+            render();
+        }
+
+        function refreshSuggestions() {
+            currentDayPlan = {};
+            localStorage.setItem('cb_v5_plan', JSON.stringify(currentDayPlan));
+            render();
+        }
+
+        function calculateScore(combo, forbidden) {
+            if (combo.baseNames.some(n => forbidden.includes(n.toLowerCase()))) return -1000;
+            const pricing = getComboPricing(combo.baseNames, globalPeople);
+            if (pricing.missingItems.length > 0) return -1;
+
+            // Emergency Mode: Filter if too expensive
+            const isEmergency = document.getElementById('emergency-mode').checked;
+            if (isEmergency && pricing.totalPersonalCost > 50) return -1;
+
+            return (2000 / (pricing.totalPersonalCost + 1) * 0.7) + (10 / (combo.frequency + 1) * 0.3);
+        }
+
+        function render() {
+            renderDashboard();
+
+            // Inventory render
+            const ilist = document.getElementById('base-meal-list');
+            ilist.innerHTML = baseMeals.length ? '<div class="day-header">INVENTORY & TRENDS</div>' : '';
+            baseMeals.sort((a, b) => a.name.localeCompare(b.name) || a.numPeople - b.numPeople).forEach(m => {
+                let trend = '';
+                if (m.history && m.history.length > 0) {
+                    const last = m.history[m.history.length - 1].price;
+                    const diff = m.totalPrice - last;
+                    trend = diff > 0 ? `<small style="color:var(--danger)">📈 Up KSh ${diff}</small>` :
+                        diff < 0 ? `<small style="color:var(--cyan-accent)">📉 Down KSh ${Math.abs(diff)}</small>` : '';
+                }
+
+                ilist.innerHTML += `<div style="padding:15px; border-bottom:1px solid var(--slate-700); font-size:14px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>${m.name} <small style="color:var(--gray-400)">(${m.numPeople}p variant)</small> ${trend}<br><b style="color:var(--cyan-accent)">KSh ${m.totalPrice}</b></div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="outline" style="padding:4px 8px;" onclick="editItem(${m.id})">Edit</button>
+                        <button class="outline" style="padding:4px 8px; color:var(--danger); border-color:var(--danger);" onclick="deleteItem(${m.id})">Del</button>
+                    </div>
+                </div>`;
+            });
+
+            // Combo render with Grocery inputs
+            const groceryList = document.getElementById('grocery-plan-list');
+            if (groceryList) { // Check if element exists before trying to manipulate
+                groceryList.innerHTML = combinations.map(c => `
+                    <div class="card" style="padding:10px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <span><b>${c.name}</b> (${c.targetTime})</span>
+                        <input type="number" class="grocery-input" data-id="${c.id}" value="0" min="0" style="width:50px; padding:5px; margin:0;">
+                    </div>
+                `).join('');
+            }
+
+            // Chips
+            const container = document.getElementById('item-chips');
+            if (container) {
+                container.innerHTML = '';
+                [...new Set(baseMeals.map(m => m.name.toLowerCase()))].forEach(name => {
+                    container.innerHTML += `<div class="chip ${selectedBaseNames.includes(name) ? 'selected' : ''}" onclick="toggleChip('${name}')">${name}</div>`;
+                });
+            }
+            updateSuggestions();
+        }
+
+        function toggleChip(name) {
+            const idx = selectedBaseNames.indexOf(name);
+            if (idx > -1) selectedBaseNames.splice(idx, 1); else selectedBaseNames.push(name);
+            render();
+        }
+
+        function renderDashboard() {
+            if (Object.keys(currentDayPlan).length === 0 && combinations.length > 0) {
+                let forbidden = [...eatenTodayIngredients];
+                ["Breakfast", "Lunch", "Dinner"].forEach(time => {
+                    const top = combinations
+                        .filter(c => c.targetTime === time)
+                        .map(c => ({ combo: c, score: calculateScore(c, forbidden) }))
+                        .filter(x => x.score >= 0)
+                        .sort((a, b) => b.score - a.score)[0];
+                    if (top) {
+                        currentDayPlan[time] = top.combo.id;
+                        top.combo.baseNames.forEach(n => forbidden.push(n.toLowerCase()));
+                    }
+                });
+                localStorage.setItem('cb_v5_plan', JSON.stringify(currentDayPlan));
+            }
+
+            renderSlotUI('breakfast-slot', 'Breakfast');
+            renderSlotUI('lunch-slot', 'Lunch');
+            renderSlotUI('dinner-slot', 'Dinner');
+
+            const summary = document.getElementById('eaten-summary');
+            summary.innerHTML = eatenTodayIngredients.length ? `
+                <div class="card" style="border: 1px dashed var(--slate-700); background: transparent;">
+                    <small style="color: var(--gray-400); text-transform: uppercase; letter-spacing: 1px;">Eaten Today:</small>
+                    <div style="margin-top: 10px; display:flex; flex-wrap:wrap; gap:8px;">
+                        ${eatenTodayIngredients.map(i => `<span style="color:var(--cyan-accent); font-size:12px;">✅ ${i}</span>`).join('')}
+                    </div>
+                    <button class="outline" style="margin-top: 15px; width: 100%; border-color: var(--danger); color: var(--danger);" onclick="resetDay()">Reset For New Day</button>
+                </div>
+            ` : '';
+        }
+
+        function renderSlotUI(divId, type) {
+            const slot = document.getElementById(divId);
+            const comboId = currentDayPlan[type];
+            const combo = combinations.find(c => c.id === comboId);
+
+            if (!combo) {
+                slot.innerHTML = `<div class="card" style="padding:20px; text-align:center; color:var(--gray-400); border:1px dashed var(--slate-700); background:transparent;">No variation found.</div>`;
+                return;
+            }
+
+            const pricing = getComboPricing(combo.baseNames, globalPeople);
+            const vibe = combo.vibe ? `<div style="font-size:24px; margin-bottom:5px;">${vibeIcons[combo.vibe]}</div>` : '';
+
+            slot.innerHTML = `
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            ${vibe}
+                            <div style="font-size: 18px; font-weight: 800; margin-bottom: 5px;">${combo.name}</div>
+                            <div style="color: var(--cyan-accent); font-weight: 700;">KSh ${pricing.totalPersonalCost.toFixed(0)} <small style="color:var(--gray-400); font-weight:normal;">/ person</small></div>
+                        </div>
+                        <button style="padding: 6px 12px; font-size: 11px;" onclick="markEaten('${type}')">EAT THIS</button>
+                    </div>
+
+                    <div style="margin-top:15px; padding:10px; background: rgba(0,0,0,0.2); border-radius:8px;">
+                        <small style="color:var(--gray-400); text-transform:uppercase; font-size:10px;">Math Breakdown:</small>
+                        ${pricing.details.map(d => `
+                            <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:5px;">
+                                <span>${d.name}${d.isScaled ? ` <small style="color:var(--gray-500)">(scaled ${d.originalP}p)</small>` : ''}</span>
+                                <span>KSh ${d.price.toFixed(0)}</span>
+                            </div>
+                        `).join('')}
+                        <div style="margin-top:8px; border-top:1px solid var(--slate-700); padding-top:5px; display:flex; justify-content:space-between; font-weight:bold; font-size:13px;">
+                            <span>Group Total (${globalPeople}p)</span>
+                            <span>KSh ${pricing.totalGroupCost.toFixed(0)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateSuggestions() {
+            const container = document.getElementById('suggestion-container');
+            if (!container) return;
+            const budget = parseFloat(document.getElementById('budget-input').value) || 999999;
+            const time = document.getElementById('time-filter').value;
+
+            const forbidden = [...eatenTodayIngredients];
+            const html = combinations
+                .filter(c => c.targetTime === time)
+                .map(c => {
+                    const p = getComboPricing(c.baseNames, globalPeople);
+                    return { combo: c, pricing: p };
+                })
+                .filter(x => x.pricing.totalPersonalCost <= budget && x.pricing.missingItems.length === 0)
+                .sort((a, b) => calculateScore(b.combo, forbidden) - calculateScore(a.combo, forbidden))
+                .map(x => `
+                    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <b>${vibeIcons[x.combo.vibe] || ''} ${x.combo.name}</b><br>
+                            <small color="var(--cyan-accent)">KSh ${x.pricing.totalPersonalCost.toFixed(0)} / person</small>
+                        </div>
+                        <button class="outline" style="padding:5px 10px;" onclick="document.getElementById('combo-time').value='${x.combo.targetTime}'; currentDayPlan['${x.combo.targetTime}']= ${x.combo.id}; render();">Select</button>
+                    </div>
+                `).join('');
+
+            container.innerHTML = html || '<div style="text-align:center; color:var(--gray-400)">No matches for this budget.</div>';
+        }
+
+        render();
+    </script>
+</body>
+
+</html>```

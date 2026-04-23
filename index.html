@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComradeBite - Master Your Student Budget</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Montserrat:wght@900&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #080c14; --card: rgba(30, 41, 59, 0.85); --accent: #22d3ee; --text: #f8fafc; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; background-image: linear-gradient(rgba(8,12,20,0.85), rgba(8,12,20,0.85)), url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=2070'); background-size: cover; background-attachment: fixed; min-height: 100vh; text-align: center; }
+
+        .top-bar { padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .logo { font-family: 'Montserrat'; font-weight: 900; font-size: 22px; color: var(--text); text-decoration: none; }
+        .logo span { color: var(--accent); }
+
+        .app-container { width: 100%; max-width: 750px; padding: 40px 20px; box-sizing: border-box; margin: 0 auto; }
+        h1 { font-family: 'Montserrat'; font-size: 42px; margin-bottom: 10px; }
+        .tagline { color: var(--accent); font-weight: 800; font-size: 18px; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 1px; }
+
+        .btn { padding: 18px 30px; border-radius: 14px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.2s; border: none; font-size: 16px; width: 100%; box-sizing: border-box; display: block; text-decoration: none; margin-bottom: 15px; }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="#" class="logo">Comrade<span>Bite</span></a>
+        <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/?mode=login'" style="background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">Login</button>
+    </div>
+
+    <div class="app-container">
+        <div style="background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(30, 41, 59, 0.8)); padding: 40px; border-radius: 30px; border: 1px solid var(--accent); margin-bottom: 40px;">
+            <h2>Start Your Group Journey</h2>
+            <p>New here? Register to create your profile and unlock the primary function of ComradeBite: <b>Collaborative Group Planning</b>.</p>
+            <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/?mode=register'" class="btn btn-primary" style="margin-bottom: 0;">Register New Account</button>
+        </div>
+
+        <h1>Comrade<span>Bite</span></h1>
+        <div class="tagline">Master Your Student Budget</div>
+
+        <p>Manage your inventory, plan your week, and sync with your roommates in real-time. Built for students, by students.</p>
+
+        <a href="ComradeBite.apk" class="btn btn-primary" download style="margin-top: 40px;">📥 Download Android App (APK)</a>
+        <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/?mode=register'" class="btn btn-secondary">Register Account</button>
+    </div>
+</body>
+</html>

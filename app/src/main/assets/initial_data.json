@@ -1,0 +1,28 @@
+{
+  "base_meals": [
+    {"name": "Rice", "totalPrice": 200.0, "numPeople": 4},
+    {"name": "Beans", "totalPrice": 150.0, "numPeople": 4},
+    {"name": "Ugali", "totalPrice": 100.0, "numPeople": 4},
+    {"name": "Sukuma Wiki", "totalPrice": 50.0, "numPeople": 4},
+    {"name": "Eggs", "totalPrice": 120.0, "numPeople": 4},
+    {"name": "Milk", "totalPrice": 60.0, "numPeople": 1},
+    {"name": "Bread", "totalPrice": 65.0, "numPeople": 2},
+    {"name": "Tea Leaves", "totalPrice": 30.0, "numPeople": 10},
+    {"name": "Sugar", "totalPrice": 150.0, "numPeople": 10},
+    {"name": "Cabbage", "totalPrice": 60.0, "numPeople": 4},
+    {"name": "Beef", "totalPrice": 300.0, "numPeople": 2},
+    {"name": "Chicken", "totalPrice": 600.0, "numPeople": 4}
+  ],
+  "meal_combinations": [
+    {"name": "Tea & Bread", "baseNames": ["Tea Leaves", "Sugar", "Milk", "Bread"], "targetTime": "Breakfast"},
+    {"name": "Tea & Eggs", "baseNames": ["Tea Leaves", "Sugar", "Milk", "Eggs"], "targetTime": "Breakfast"},
+    {"name": "Rice & Beans", "baseNames": ["Rice", "Beans"], "targetTime": "Lunch"},
+    {"name": "Ugali & Sukuma", "baseNames": ["Ugali", "Sukuma Wiki"], "targetTime": "Lunch"},
+    {"name": "Ugali & Cabbage", "baseNames": ["Ugali", "Cabbage"], "targetTime": "Lunch"},
+    {"name": "Ugali & Eggs", "baseNames": ["Ugali", "Eggs"], "targetTime": "Dinner"},
+    {"name": "Rice & Beef", "baseNames": ["Rice", "Beef"], "targetTime": "Dinner", "isSpecial": false},
+    {"name": "Ugali & Beef", "baseNames": ["Ugali", "Beef"], "targetTime": "Dinner"},
+    {"name": "Rice & Chicken", "baseNames": ["Rice", "Chicken"], "targetTime": "Dinner", "isSpecial": true},
+    {"name": "Ugali & Chicken", "baseNames": ["Ugali", "Chicken"], "targetTime": "Dinner", "isSpecial": true}
+  ]
+}

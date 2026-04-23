@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="1080dp"
+    android:height="2400dp"
+    android:viewportWidth="1080"
+    android:viewportHeight="2400">
+
+    <!-- Deep Navy Background -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M0,0h1080v2400h-1080z" />
+
+    <!-- Subtle Grain/Texture or Gradient Overlay -->
+    <path
+        android:pathData="M0,0h1080v2400h-1080z">
+        <aapt:attr name="android:fillColor" xmlns:aapt="http://schemas.android.com/aapt">
+            <gradient
+                android:angle="270"
+                android:endColor="#1E293B"
+                android:startColor="#0F172A"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+
+    <!-- Decorative Circles to mimic a blurred food/abstract background -->
+    <path
+        android:fillAlpha="0.1"
+        android:fillColor="#00D1FF"
+        android:pathData="M200,400m-300,0a300,300 0,1 1,600 0a300,300 0,1 1,-600 0" />
+
+    <path
+        android:fillAlpha="0.05"
+        android:fillColor="#0D9488"
+        android:pathData="M800,1800m-400,0a400,400 0,1 1,800 0a400,400 0,1 1,-800 0" />
+
+</vector>

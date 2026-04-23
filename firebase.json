@@ -1,0 +1,21 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "app/**",
+      "gradle/**",
+      ".gradle/**",
+      ".idea/**",
+      "build/**",
+      "gradlew",
+      "gradlew.bat",
+      "local.properties",
+      "*.db",
+      "*.exe",
+      "*.bin"
+    ]
+  }
+}
