@@ -12,12 +12,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.comradebite.data.MealCombination
 import com.comradebite.ui.theme.CyanAccent
 import com.comradebite.viewmodel.MealViewModel
 
 @Composable
 fun TimetableScreen(viewModel: MealViewModel) {
-    val weeklyPlan by viewModel.weeklyTimetable.collectAsState(initial = emptyList())
+    val weeklyPlan by viewModel.weeklyTimetable.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     
     val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")

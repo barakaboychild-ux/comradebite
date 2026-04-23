@@ -1,6 +1,7 @@
 package com.comradebite.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -137,7 +138,7 @@ fun MainScreen(viewModel: MealViewModel) {
                         onClick = {
                             val sendIntent: Intent = Intent().apply {
                                 action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, "Hey! Check out ComradeBite, it's helping me manage my meals perfectly!")
+                                putExtra(Intent.EXTRA_TEXT, "Hey! Check out ComradeBite to manage your meals perfectly: https://comradebite.vercel.app/")
                                 type = "text/plain"
                             }
                             val shareIntent = Intent.createChooser(sendIntent, null)

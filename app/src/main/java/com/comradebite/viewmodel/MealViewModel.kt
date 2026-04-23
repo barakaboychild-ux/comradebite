@@ -47,9 +47,9 @@ class MealViewModel(
         private const val SCORE_VARIETY_WEIGHT = 0.3
         
         private const val PENALTY_UGALI_LUNCH = 3000.0
-        private const val BONUS_SPECIAL_DINNER = 1000.0
-        private const val PENALTY_NOT_SPECIAL_DINNER = 2000.0
-        private const val PENALTY_RARE_RECENT = 10000.0
+        private const val BONUS_SPECIAL_MEAL = 8000.0 // Higher to guarantee special day slots
+        private const val PENALTY_NON_SPECIAL_DAY = 6000.0 // Heavy penalty to keep special meals for special days
+        private const val PENALTY_RARE_RECENT = 15000.0 // Extremely high to block more than once a week
         private const val PENALTY_RARE_BASE = 1500.0
         private const val PENALTY_VARIETY_STEP = 500.0
         private const val RANDOM_OFFSET_MAX = 50.0
@@ -108,8 +108,63 @@ class MealViewModel(
         _eatenTodayComboIds,
         _currentDay
     ) { combos, baseMeals, eaten, eatenIds, _ ->
-        calculatePlanForDay(combos, baseMeals, _groupSize.value, eaten, eatenIds, false, emptyMap(), false)
+        val isTodaySpecial = LocalDate.now().dayOfWeek.value.let { it == 3 || it == 5 || it == 7 }
+        calculatePlanForDay(
+            combos = combos,
+            baseMeals = baseMeals,
+            size = _groupSize.value,
+            eaten = eaten,
+            eatenIds = eatenIds,
+            forceSpecial = isTodaySpecial,
+            planned = emptyMap(),
+            random = false
+        )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    val weeklyTimetable: StateFlow<List<Map<String, MealCombination?>>> = combine(
+        allCombinations,
+        allBaseMeals,
+        _groupSize
+    ) { combos, baseMeals, size ->
+        if (combos.isEmpty()) return@combine emptyList()
+
+        val cal = Calendar.getInstance()
+        val seed = cal.get(Calendar.YEAR) * 100L + cal.get(Calendar.WEEK_OF_YEAR)
+        val weekRandom = Random(seed)
+
+        val weekly = mutableListOf<Map<String, MealCombination?>>()
+        val rareIdsUsedThisWeek = mutableSetOf<Int>()
+        val allIdsUsedThisWeek = mutableMapOf<Int, Int>()
+        val weeklyIngredientHistory = mutableSetOf<String>()
+        
+        repeat(7) { i ->
+            val dayNumber = i + 1
+            val isDaySpecial = dayNumber == 3 || dayNumber == 5 || dayNumber == 7
+            
+            val dayPlan = calculatePlanForDay(
+                combos = combos,
+                baseMeals = baseMeals,
+                size = size,
+                eaten = emptySet(),
+                eatenIds = emptySet(),
+                forceSpecial = isDaySpecial,
+                planned = allIdsUsedThisWeek,
+                random = true,
+                randomSource = weekRandom,
+                rareIdsThisWeek = rareIdsUsedThisWeek,
+                weeklyIngredientHistory = weeklyIngredientHistory
+            )
+            
+            weekly.add(dayPlan)
+            dayPlan.values.filterNotNull().forEach { combo ->
+                allIdsUsedThisWeek[combo.id] = allIdsUsedThisWeek.getOrDefault(combo.id, 0) + 1
+                if (combo.isRare) rareIdsUsedThisWeek.add(combo.id)
+                combo.baseNames.forEach { weeklyIngredientHistory.add(it.trim().lowercase()) }
+            }
+            if ((i + 1) % 2 == 0) weeklyIngredientHistory.clear()
+        }
+        weekly
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         viewModelScope.launch {
@@ -326,6 +381,18 @@ class MealViewModel(
         }
     }
 
+    fun insertBaseMeal(name: String, price: Double, serves: Int, id: Int = 0) {
+        viewModelScope.launch {
+            repository.insertBaseMeal(BaseMeal(id = id, name = name, totalPrice = price, numPeople = serves))
+        }
+    }
+
+    fun deleteBaseMeal(meal: BaseMeal) {
+        viewModelScope.launch {
+            repository.deleteBaseMeal(meal)
+        }
+    }
+
     fun setGroupSize(s: Int) { _groupSize.value = s.coerceIn(1, MAX_GROUP_SIZE) }
     fun setBudget(b: Double?) { _budgetPerPerson.value = b }
     fun toggleTheme() {
@@ -342,30 +409,48 @@ class MealViewModel(
         eatenIds: Set<Int>,
         forceSpecial: Boolean,
         planned: Map<Int, Int>,
-        random: Boolean
+        random: Boolean,
+        randomSource: Random? = null,
+        rareIdsThisWeek: Set<Int> = emptySet(),
+        weeklyIngredientHistory: Set<String> = emptySet()
     ): Map<String, MealCombination?> {
         val plan = mutableMapOf<String, MealCombination?>()
-        val ingsUsed = eaten.map { it.trim().lowercase() }.toMutableSet()
-        val idsUsed = eatenIds.toMutableSet()
-        val nowMs = System.currentTimeMillis()
+        val ingsUsedToday = eaten.map { it.trim().lowercase() }.toMutableSet()
+        val idsUsedToday = eatenIds.toMutableSet()
 
         listOf("Breakfast", "Lunch", "Dinner").forEach { time ->
-            // FIX: Keep eaten meal visible in its slot
-            val eatenInSlot = combos.find { it.id in eatenIds && it.targetTime == time }
-            if (eatenInSlot != null) {
-                plan[time] = eatenInSlot
-                eatenInSlot.baseNames.forEach { ingsUsed.add(it.trim().lowercase()) }
-                return@forEach
+            val cand = combos.filter { combo ->
+                combo.targetTime == time && 
+                combo.id !in idsUsedToday &&
+                combo.id !in rareIdsThisWeek
             }
 
-            val cand = combos.filter { it.targetTime == time && it.id !in idsUsed && !isAnyIngredientUsed(it, ingsUsed) }
-                .ifEmpty { combos.filter { it.targetTime == time && it.id !in idsUsed } }
+            val filteredByIng = cand.filter { !isAnyIngredientUsed(it, ingsUsedToday) }
+            val finalCandidates = if (filteredByIng.isNotEmpty()) filteredByIng else cand
 
-            val pick = cand.maxByOrNull { calculateScore(it, baseMeals, size) + if (random) Random.nextDouble(0.0, 50.0) else 0.0 }
+            val pick = finalCandidates.maxByOrNull { combo ->
+                var score = calculateScore(combo, baseMeals, size, forceSpecial)
+                
+                val timesUsedInPlan = planned[combo.id] ?: 0
+                if (timesUsedInPlan > 0) {
+                    val repeatPenalty = if (forceSpecial && combo.isSpecial) 1000.0 else 10000.0
+                    score -= repeatPenalty * timesUsedInPlan
+                }
+                
+                if (isAnyIngredientUsed(combo, weeklyIngredientHistory)) {
+                    score -= 1500.0
+                }
+
+                if (random) {
+                    score += (randomSource ?: Random).nextDouble(0.0, RANDOM_OFFSET_MAX)
+                }
+                score
+            }
+            
             plan[time] = pick
             pick?.let {
-                idsUsed.add(it.id)
-                it.baseNames.forEach { n -> ingsUsed.add(n.trim().lowercase()) }
+                idsUsedToday.add(it.id)
+                it.baseNames.forEach { n -> ingsUsedToday.add(n.trim().lowercase()) }
             }
         }
         return plan
@@ -375,9 +460,43 @@ class MealViewModel(
         return c.baseNames.any { it.trim().lowercase() in used }
     }
 
-    private fun calculateScore(c: MealCombination, bm: List<BaseMeal>, s: Int): Double {
-        val share = getIndividualShare(c, bm, s) ?: return -1.0
-        return (2000.0 / (share + 1.0)) * 0.7 + (10.0 / (c.frequency + 1.0)) * 0.3
+    private fun calculateScore(c: MealCombination, bm: List<BaseMeal>, s: Int, isSpecialDay: Boolean): Double {
+        val share = getIndividualShare(c, bm, s) ?: return -20000.0
+        
+        val budget = _budgetPerPerson.value
+        if (budget != null && share > budget) return -30000.0
+
+        var score = (2000.0 / (share + 1.0)) * SCORE_AFFORDABILITY_WEIGHT
+        score += (10.0 / (c.frequency + 1.0)) * SCORE_VARIETY_WEIGHT
+        
+        val daysSinceLastEaten = if (c.lastEaten == 0L) 30L else (System.currentTimeMillis() - c.lastEaten) / (24 * 60 * 60 * 1000)
+        if (daysSinceLastEaten < 3) {
+            score -= (3 - daysSinceLastEaten) * PENALTY_VARIETY_STEP
+        }
+        
+        if (c.targetTime == "Lunch" && c.name.contains("Ugali", true)) score -= PENALTY_UGALI_LUNCH
+        
+        if (isSpecialDay) {
+            if (c.isSpecial) {
+                score += BONUS_SPECIAL_MEAL
+            } else if (c.targetTime != "Breakfast") {
+                score -= PENALTY_NON_SPECIAL_DAY
+            }
+        } else {
+            // Reserve special meals for special days
+            if (c.isSpecial) {
+                score -= PENALTY_NON_SPECIAL_DAY
+            }
+        }
+
+        if (c.isRare) {
+            // Rule: Rare meals strictly once per week logic is handled in the filter, 
+            // but we also penalize recent history here.
+            if (daysSinceLastEaten < TWO_WEEKS_DAYS) score -= PENALTY_RARE_RECENT
+            else score -= PENALTY_RARE_BASE
+        }
+        
+        return score
     }
 
     fun getIndividualShare(c: MealCombination, bm: List<BaseMeal>, s: Int): Double? {

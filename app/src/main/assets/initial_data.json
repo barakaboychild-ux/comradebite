@@ -19,8 +19,9 @@
     {"name": "Rice & Beans", "baseNames": ["Rice", "Beans"], "targetTime": "Lunch"},
     {"name": "Ugali & Sukuma", "baseNames": ["Ugali", "Sukuma Wiki"], "targetTime": "Lunch"},
     {"name": "Ugali & Cabbage", "baseNames": ["Ugali", "Cabbage"], "targetTime": "Lunch"},
+    {"name": "Rice & Beef", "baseNames": ["Rice", "Beef"], "targetTime": "Lunch", "isSpecial": true},
     {"name": "Ugali & Eggs", "baseNames": ["Ugali", "Eggs"], "targetTime": "Dinner"},
-    {"name": "Rice & Beef", "baseNames": ["Rice", "Beef"], "targetTime": "Dinner", "isSpecial": false},
+    {"name": "Rice & Beef", "baseNames": ["Rice", "Beef"], "targetTime": "Dinner", "isSpecial": true},
     {"name": "Ugali & Beef", "baseNames": ["Ugali", "Beef"], "targetTime": "Dinner"},
     {"name": "Rice & Chicken", "baseNames": ["Rice", "Chicken"], "targetTime": "Dinner", "isSpecial": true},
     {"name": "Ugali & Chicken", "baseNames": ["Ugali", "Chicken"], "targetTime": "Dinner", "isSpecial": true}

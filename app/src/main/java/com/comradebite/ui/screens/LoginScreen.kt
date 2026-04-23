@@ -24,7 +24,7 @@ fun LoginScreen(viewModel: MealViewModel, onLoginSuccess: () -> Unit) {
     var isRegisterMode by remember { mutableStateOf(true) }
     
     val context = LocalContext.current
-    val functionalSiteUrl = "https://comradebite-c0265c98.firebaseapp.com/"
+    val baseUrl = "https://comradebite-c0265c98.firebaseapp.com/"
 
     Column(
         modifier = Modifier
@@ -57,10 +57,11 @@ fun LoginScreen(viewModel: MealViewModel, onLoginSuccess: () -> Unit) {
         
         Spacer(Modifier.height(48.dp))
         
-        // Main Action Button - Redirects IMMEDIATELY to the functional site
+        // Main Action Button - Redirects to the functional site with appropriate mode
         Button(
             onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(functionalSiteUrl))
+                val finalUrl = if (isRegisterMode) baseUrl else "$baseUrl?mode=login"
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl))
                 context.startActivity(intent)
                 onLoginSuccess()
             },

@@ -13,6 +13,7 @@ class MealReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val message = intent.getStringExtra("message") ?: "Time for a meal, Comrade!"
         
+        // Show the notification
         val notificationIntent = Intent(context, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             context, 0, notificationIntent,
@@ -20,7 +21,7 @@ class MealReminderReceiver : BroadcastReceiver() {
         )
 
         val notification = NotificationCompat.Builder(context, "meal_reminders")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // Using system icon for now
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("ComradeBite Reminder")
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -30,5 +31,8 @@ class MealReminderReceiver : BroadcastReceiver() {
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+
+        // IMPORTANT: Alarms are one-shot. Reschedule for the next day/meal automatically.
+        NotificationHelper.scheduleMealReminders(context)
     }
 }
