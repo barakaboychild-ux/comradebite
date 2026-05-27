@@ -3,192 +3,876 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ComradeBite - Manage Groups & Meals</title>
+    <title>ComradeBite v6.0 - Firebase Edition</title>
+    <meta name="description" content="ComradeBite: Smart meal planning with intelligent nutrition coaching built right in.">
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Montserrat:wght@900&display=swap" rel="stylesheet">
     <style>
-        :root { --bg-body: #080c14; --bg-card: rgba(30, 41, 59, 0.85); --bg-drawer: #1e293b; --text-main: #f8fafc; --text-muted: #94a3b8; --cyan-accent: #22d3ee; --emerald-accent: #10b981; --danger: #f43f5e; --glass-border: rgba(255, 255, 255, 0.1); }
-        [data-theme="light"] { --bg-body: #f1f5f9; --bg-card: rgba(255, 255, 255, 0.8); --bg-drawer: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --cyan-accent: #0891b2; --emerald-accent: #059669; --white: #000000; --glass-border: rgba(0, 0, 0, 0.1); }
+        :root {
+            --bg-body: #080c14;
+            --bg-card: rgba(30, 41, 59, 0.85);
+            --bg-drawer: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --slate-700: #334155;
+            --cyan-accent: #22d3ee;
+            --emerald-accent: #10b981;
+            --logo-gradient: linear-gradient(135deg, #22d3ee 0%, #10b981 100%);
+            --danger: #f43f5e;
+            --white: #ffffff;
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --amber: #f59e0b;
+            --violet: #a78bfa;
+        }
+        [data-theme="light"] {
+            --bg-body: #f1f5f9; --bg-card: rgba(255,255,255,0.8); --bg-drawer: #ffffff;
+            --text-main: #0f172a; --text-muted: #64748b; --slate-700: #cbd5e1;
+            --cyan-accent: #0891b2; --emerald-accent: #059669;
+            --logo-gradient: linear-gradient(135deg, #0891b2 0%, #059669 100%);
+            --danger: #e11d48; --white: #000000; --glass-border: rgba(0,0,0,0.1);
+        }
         * { box-sizing: border-box; font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; }
-        body { margin: 0; background: var(--bg-body); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
-        .top-bar { background: var(--bg-drawer); padding: 15px 20px; display: flex; align-items: center; gap: 15px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--glass-border); }
-        .logo-text { font-family: 'Montserrat'; font-weight: 900; font-size: 24px; color: var(--text-main); }
-        .logo-bite { color: var(--cyan-accent); }
-        .drawer { position: fixed; left: -300px; width: 280px; height: 100%; background: var(--bg-drawer); transition: 0.3s ease; z-index: 1000; padding: 40px 20px; border-right: 1px solid var(--glass-border); }
+        body { margin: 0; background: var(--bg-body); color: var(--text-main); overflow-x: hidden;
+            background-image: url('https://images.unsplash.com/photo-1495195134817-a1a28078aca9?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80');
+            background-size: cover; background-attachment: fixed; background-position: center; }
+
+        .logo-text { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 26px; letter-spacing: -0.5px; color: var(--white); display: inline-block; line-height: 1; }
+        .logo-bite { color: var(--cyan-accent); font-weight: 900; }
+
+        .section, .day-section, .drawer, .meal-card { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border) !important; }
+
+        .top-bar { background: var(--bg-drawer); padding: 15px 20px; display: flex; align-items: center; gap: 15px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--slate-700); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+
+        .drawer { position: fixed; top: 0; left: -300px; width: 300px; height: 100%; background: var(--bg-drawer); z-index: 1000; transition: 0.3s ease; padding: 40px 20px; overflow-y: auto; }
         .drawer.active { left: 0; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
-        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 900; display: none; backdrop-filter: blur(4px); }
+        .nav-item { padding: 15px; border-radius: 8px; cursor: pointer; margin-bottom: 5px; color: var(--text-muted); font-weight: 500; transition: background 0.2s; }
+        .nav-item.active { background: var(--cyan-accent); color: #000; font-weight: 700; }
+        .nav-item:hover:not(.active) { background: var(--slate-700); }
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 900; display: none; }
         .drawer-overlay.active { display: block; }
-        .nav-item { padding: 15px; border-radius: 12px; cursor: pointer; color: var(--text-muted); font-weight: 600; margin-bottom: 8px; }
-        .nav-item.active { background: var(--cyan-accent); color: #000; }
-        .app-container { width: 100%; max-width: 500px; padding: 20px; box-sizing: border-box; margin: 0 auto; }
-        .card { background: var(--bg-card); border-radius: 20px; padding: 22px; margin-bottom: 25px; border: 1px solid var(--glass-border); backdrop-filter: blur(12px); }
-        .card-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        #sentiment-box { background: rgba(255, 255, 255, 0.12); border-left: 6px solid var(--cyan-accent); padding: 20px; margin-bottom: 25px; border-radius: 15px; font-style: italic; }
-        .people-counter { display: flex; align-items: center; background: var(--bg-drawer); padding: 8px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--glass-border); }
-        .counter-btn { width: 40px; height: 40px; border-radius: 8px; background: var(--cyan-accent); color: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; font-weight: bold; }
+
+        .content { padding: 25px; max-width: 500px; margin: 0 auto; min-height: calc(100vh - 70px); padding-bottom: 100px; }
+        .section { display: none; padding: 0; background: transparent; }
+        .section.active { display: block; }
+
+        .day-section { background: var(--bg-card); border-radius: 20px; padding: 22px; margin-bottom: 25px; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .day-header { font-size: 15px; font-weight: 800; color: var(--white); letter-spacing: 0.5px; margin-bottom: 15px; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+        .people-counter { display: flex; align-items: center; background: var(--bg-drawer); padding: 8px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--slate-700); }
+        .counter-btn { width: 40px; height: 40px; border-radius: 8px; background: var(--slate-700); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
         .counter-val { flex: 1; text-align: center; font-weight: bold; font-size: 20px; color: var(--cyan-accent); }
-        input, select { width: 100%; padding: 14px; margin-bottom: 15px; background: #0f172a; border: 1px solid var(--glass-border); border-radius: 12px; color: #fff; outline: none; }
-        button { width: 100%; padding: 16px; background: var(--cyan-accent); border: none; border-radius: 12px; font-weight: 800; cursor: pointer; text-transform: uppercase; color: #000; }
-        button.secondary { background: transparent; border: 1px solid var(--cyan-accent); color: var(--cyan-accent); }
-        .chip { display: inline-block; padding: 10px 18px; background: #334155; border-radius: 20px; margin: 5px; cursor: pointer; font-size: 14px; color: var(--text-muted); }
+
+        input, select { width: 100%; padding: 14px; margin-bottom: 15px; background: var(--bg-drawer); border: 1px solid var(--slate-700); border-radius: 12px; color: var(--text-main); outline: none; box-sizing: border-box; }
+        button { width: 100%; padding: 16px; background: var(--cyan-accent); border: none; border-radius: 12px; font-weight: 800; cursor: pointer; color: #000; text-transform: uppercase; }
+        button.outline { background: transparent; border: 1px solid var(--cyan-accent); color: var(--cyan-accent); padding: 8px 15px; width: auto; font-size: 12px; }
+
+        .chip { display: inline-block; padding: 10px 18px; background: var(--slate-700); border-radius: 20px; margin: 5px; cursor: pointer; font-size: 14px; color: var(--text-muted); transition: all 0.2s; }
         .chip.selected { background: var(--cyan-accent); color: #000; font-weight: 700; }
-        .plan-slot { background: rgba(0,0,0,0.2); padding: 18px; border-radius: 18px; margin-top: 15px; border-left: 4px solid var(--cyan-accent); }
+
+        #sentiment-box { background: rgba(255,255,255,0.12); border-left: 6px solid var(--cyan-accent); padding: 20px; margin-bottom: 25px; border-radius: 15px; font-style: italic; color: #fff; font-size: 16px; font-weight: 500; text-shadow: 0 2px 4px rgba(0,0,0,0.5); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+
+        .theme-switch { display: flex; align-items: center; gap: 10px; margin-top: 20px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--slate-700); padding-top: 20px; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--slate-700); transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked+.slider { background-color: var(--cyan-accent); }
+        input:checked+.slider:before { transform: translateX(22px); }
+        .bottom-tag { position: absolute; bottom: 30px; left: 25px; font-size: 11px; color: var(--text-muted); letter-spacing: 1px; }
+
+        .nutri-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; margin-bottom: 4px; }
+        .nutri-pill { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--slate-700); color: var(--text-muted); }
+        .nutri-pill.active { background: rgba(34,211,238,0.18); color: var(--cyan-accent); border: 1px solid rgba(34,211,238,0.3); }
+        .nutri-pill.protein { color: #f97316; background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.25); }
+        .nutri-pill.vegetable { color: var(--emerald-accent); background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); }
+        .nutri-pill.fruit { color: #fb923c; background: rgba(251,146,60,0.12); border: 1px solid rgba(251,146,60,0.25); }
+        .nutri-pill.dairy { color: #60a5fa; background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.25); }
+        .nutri-pill.carb { color: var(--amber); background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); }
+        .nutri-pill.mixed { color: var(--violet); background: rgba(167,139,250,0.12); border: 1px solid rgba(167,139,250,0.25); }
+        .nutri-pill.kcal { color: #f43f5e; background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.25); }
+
+        .ai-hint { display: flex; align-items: flex-start; gap: 8px; background: rgba(34,211,238,0.06); border-left: 3px solid var(--cyan-accent); border-radius: 0 10px 10px 0; padding: 10px 12px; font-size: 12px; line-height: 1.55; color: var(--text-muted); margin-top: 10px; margin-bottom: 4px; animation: fadeIn 0.4s ease; }
+        .ai-hint-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+        .ai-hint b { color: var(--text-main); }
+
+        .prog-track { height: 8px; background: var(--slate-700); border-radius: 10px; overflow: hidden; margin: 6px 0; }
+        .prog-fill { height: 100%; border-radius: 10px; transition: width 0.6s ease, background 0.4s; }
+
+        .wellness-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .wellness-cell { background: var(--bg-card); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); border-radius: 14px; padding: 12px; text-align: center; cursor: default; }
+        .wellness-cell .wc-val { font-size: 20px; font-weight: 900; line-height: 1.2; }
+        .wellness-cell .wc-lbl { font-size: 10px; color: var(--text-muted); margin-top: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .water-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+        .wglass { font-size: 20px; cursor: pointer; transition: transform 0.2s, opacity 0.2s; opacity: 0.25; filter: grayscale(1); }
+        .wglass.filled { opacity: 1; filter: none; }
+        .wglass:hover { transform: scale(1.2); }
+
+        #combo-live-preview { background: var(--bg-card); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); border-radius: 14px; padding: 14px; margin-bottom: 16px; display: none; }
+        #combo-live-preview.show { display: block; animation: fadeIn 0.3s ease; }
+
+        #grocery-ai-block { border-radius: 14px; overflow: hidden; border: 1px solid var(--glass-border); background: var(--bg-card); backdrop-filter: blur(12px); margin-top: 20px; }
+        .grocery-ai-header { padding: 12px 16px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--glass-border); }
+        #grocery-ai-content { padding: 14px 16px; font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+
+        #ai-fab { position: fixed; bottom: 24px; right: 20px; z-index: 800; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, var(--cyan-accent), var(--emerald-accent)); display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; box-shadow: 0 6px 24px rgba(0,0,0,0.4); transition: transform 0.2s; border: none; text-transform: none; padding: 0; animation: pulseGlow 3s infinite; }
+        #ai-fab:hover { transform: scale(1.1); }
+        #ai-fab.offline { background: var(--slate-700); animation: none; cursor: not-allowed; opacity: 0.5; }
+
+        #ai-chat-panel { position: fixed; bottom: 90px; right: 16px; z-index: 799; width: 320px; max-width: calc(100vw - 32px); background: var(--bg-drawer); border: 1px solid var(--glass-border); border-radius: 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); backdrop-filter: blur(20px); overflow: hidden; display: none; animation: slideUp 0.3s ease; }
+        #ai-chat-panel.open { display: flex; flex-direction: column; }
+
+        .ai-chat-topbar { padding: 14px 16px; background: linear-gradient(135deg, #0f2027 0%, #203a43 100%); display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+        .ai-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--logo-gradient); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .ai-chat-name { font-size: 13px; font-weight: 800; color: var(--cyan-accent); }
+        .ai-chat-sub { font-size: 10px; color: var(--text-muted); }
+        .ai-close { color: var(--text-muted); cursor: pointer; font-size: 18px; line-height: 1; }
+        .ai-chat-messages { padding: 12px; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .ai-msg { border-radius: 12px; padding: 10px 12px; font-size: 12px; line-height: 1.55; max-width: 90%; }
+        .ai-msg.bot { background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.2); color: var(--text-main); align-self: flex-start; }
+        .ai-msg.user { background: var(--slate-700); color: var(--text-main); align-self: flex-end; }
+        .ai-quick-row { display: flex; gap: 5px; flex-wrap: wrap; padding: 0 12px 10px; }
+        .ai-qchip { font-size: 11px; padding: 4px 9px; background: var(--slate-700); border-radius: 14px; cursor: pointer; color: var(--text-muted); border: none; width: auto; text-transform: none; font-weight: 600; transition: all 0.15s; }
+        .ai-qchip:hover { background: var(--cyan-accent); color: #000; }
+        .ai-input-row { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--glass-border); }
+        .ai-input-row input { margin: 0; padding: 9px 12px; font-size: 12px; border-radius: 10px; }
+        .ai-input-row button { width: auto; padding: 9px 14px; font-size: 11px; border-radius: 10px; flex-shrink: 0; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+        @keyframes pulseGlow { 0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,0.4); } 50% { box-shadow: 0 6px 30px rgba(34,211,238,0.5); } }
+        @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+        /* Auth styling */
         #auth-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.98); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(10px); }
-        .auth-card { background: #1e293b; padding: 40px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center; }
-        .mode-link { color: var(--cyan-accent); cursor: pointer; text-decoration: underline; font-size: 14px; display: inline-block; margin-top: 15px; }
+        .auth-card { background: #1e293b; padding: 40px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--glass-border); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
     <div id="auth-overlay">
         <div class="auth-card">
-            <div class="logo-text" style="font-size: 32px; margin-bottom: 20px;">Comrade<span>Bite</span></div>
+            <div class="logo-text" style="font-size: 32px; margin-bottom: 20px;">Comrade<span class="logo-bite">Bite</span></div>
             <div id="auth-view">
-                <p id="auth-desc" style="color: #94a3b8; margin-bottom: 20px;">Join to start planning meals with your roommates.</p>
+                <p id="auth-desc" style="color: #94a3b8; margin-bottom: 20px; font-size: 14px;">Join to start planning meals with your roommates.</p>
                 <input type="email" id="email" placeholder="Email">
                 <input type="password" id="password" placeholder="Password">
                 <button id="auth-btn" onclick="handleAuth()">Register</button>
                 <p style="margin-top: 20px; font-size: 14px; color: var(--cyan-accent); cursor: pointer;" onclick="toggleAuth()" id="auth-toggle">login instead if you have an account</p>
             </div>
-            <p id="error" style="color: var(--danger); margin-top: 15px; font-size: 12px;"></p>
+            <p id="error" style="color: var(--danger); margin-top: 15px; font-size: 12px; font-weight: bold;"></p>
         </div>
     </div>
 
     <div class="drawer-overlay" id="overlay" onclick="toggleDrawer()"></div>
+
     <div class="drawer" id="drawer">
-        <div class="logo-text" style="margin-bottom: 30px;">Comrade<span class="logo-bite">Bite</span></div>
-        <div class="nav-item active" onclick="switchSection('dashboard')">Home Dashboard</div>
-        <div class="nav-item" onclick="switchSection('group')">Group Management</div>
-        <div class="nav-item" onclick="switchSection('inventory')">Meal Inventory</div>
-        <div class="nav-item" onclick="switchSection('combos')">Combo Builder</div>
-        <hr style="opacity: 0.1; margin: 20px 0;">
-        <button class="secondary" onclick="firebase.auth().signOut()">Logout</button>
+        <div class="logo-text" style="font-size:32px; margin-bottom:30px;">Comrade<span class="logo-bite">Bite</span></div>
+        <div class="nav-item active" id="nav-dashboard"  onclick="switchSection('dashboard')">🏠 Home Dashboard</div>
+        <div class="nav-item"        id="nav-group"      onclick="switchSection('group')">👥 Group Management</div>
+        <div class="nav-item"        id="nav-items"      onclick="switchSection('items')">📦 Meal Inventory</div>
+        <div class="nav-item"        id="nav-combos"     onclick="switchSection('combos')">🔗 Combo Builder</div>
+        <div class="nav-item"        id="nav-decide"     onclick="switchSection('decide')">🎯 Smart Decisions</div>
+        <div class="nav-item"        id="nav-grocery"    onclick="switchSection('grocery')">🛒 Grocery Assistant</div>
+        <div class="theme-switch">
+            <span>Dark</span>
+            <label class="switch"><input type="checkbox" id="theme-toggle" onchange="toggleTheme()"><span class="slider"></span></label>
+            <span>Light</span>
+        </div>
+        <hr style="opacity: 0.1; margin: 20px 0; border: 1px solid var(--slate-700);">
+        <button class="outline" style="border-color: var(--danger); color: var(--danger);" onclick="firebase.auth().signOut()">Logout</button>
+        <div class="bottom-tag">COMRADEBITE v6.0</div>
     </div>
 
     <div class="top-bar">
-        <div onclick="toggleDrawer()" style="cursor:pointer; font-size: 24px;">☰</div>
-        <div class="logo-text" style="flex: 1;">Comrade<span class="logo-bite">Bite</span></div>
-        <div id="active-group-header" style="background: rgba(34, 211, 238, 0.1); color: var(--cyan-accent); padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 800;">No Group</div>
+        <div style="cursor:pointer; font-size:22px;" onclick="toggleDrawer()">☰</div>
+        <div class="logo-text" style="flex:1;">Comrade<span class="logo-bite">Bite</span> <small style="font-size:10px; opacity:0.5; font-family:Inter,sans-serif; font-weight:400; text-transform:none;">v6.0</small></div>
+        <div id="active-group-header" style="background: rgba(34, 211, 238, 0.1); color: var(--cyan-accent); padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 800; border: 1px solid rgba(34,211,238,0.3);">No Group</div>
+        <div id="top-water" onclick="focusWater()" style="cursor:pointer; font-size:12px; font-weight:800; color:var(--cyan-accent); margin-left:10px;" title="Log water">💧 0/8</div>
     </div>
 
-    <div class="app-container">
-        <!-- Group Management -->
-        <div id="section-group" class="section" style="display:none">
-            <div class="card">
-                <div class="card-title">Create a Group</div>
-                <p style="color: #94a3b8; font-size: 13px; margin-bottom: 10px;">The primary function of ComradeBite is collaborating. Create your first group here.</p>
+    <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:linear-gradient(to bottom,rgba(0,0,0,0.8),rgba(0,0,0,0.5)); z-index:-1;"></div>
+
+    <div class="content">
+
+        <!-- ══════════════════ DASHBOARD ══════════════════ -->
+        <div id="section-dashboard" class="section active">
+            <div id="sentiment-box">"A hungry comrade is a weary comrade. Fuel up for excellence!"</div>
+            
+            <div class="wellness-row" id="wellness-row"></div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div class="day-header" style="margin-bottom:0;">Daily Plan</div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--danger); cursor:pointer;">
+                        <input type="checkbox" id="emergency-mode" onchange="render()"> Budget &lt;50
+                    </label>
+                    <button class="outline" onclick="refreshSuggestions()">Refresh</button>
+                </div>
+            </div>
+
+            <div class="people-counter">
+                <div class="counter-btn" onclick="changeGS(-1)">−</div>
+                <div class="counter-val" id="global-people-val">1</div>
+                <div class="counter-btn" onclick="changeGS(1)">+</div>
+            </div>
+
+            <div id="dashboard-slots">
+                <div class="day-section"><div class="day-header">Breakfast</div><div id="breakfast-slot"></div></div>
+                <div class="day-section" style="border-left-color:var(--cyan-accent);"><div class="day-header" style="color:var(--cyan-accent);">Lunch</div><div id="lunch-slot"></div></div>
+                <div class="day-section" style="border-left-color:#FACC15;"><div class="day-header" style="color:#FACC15;">Dinner</div><div id="dinner-slot"></div></div>
+            </div>
+
+            <div id="eaten-summary" style="margin-top:20px;"></div>
+
+            <div id="water-block" style="background:var(--bg-card); border:1px solid var(--glass-border); border-radius:16px; padding:16px; margin-top:16px; backdrop-filter:blur(12px); display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-size:13px; font-weight:700;">💧 Hydration</span>
+                    <span id="water-count-lbl" style="font-size:13px; font-weight:800; color:var(--cyan-accent);"></span>
+                </div>
+                <div class="water-row" id="water-glasses-row"></div>
+                <div id="water-hint" style="font-size:11px; color:var(--text-muted); margin-top:6px;"></div>
+            </div>
+
+            <div id="dashboard-ai-hint"></div>
+        </div>
+
+        <!-- ══════════════════ GROUP MANAGEMENT ══════════════════ -->
+        <div id="section-group" class="section">
+            <div class="day-section">
+                <div class="day-header">Create a Group</div>
+                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Start a group to sync meals with your roommates.</p>
                 <input id="new-group-name" placeholder="Group Name">
                 <button onclick="createGroup()">Create New Group</button>
             </div>
-            <div class="card">
-                <div class="card-title">Join a Group</div>
-                <p style="color: #94a3b8; font-size: 13px; margin-bottom: 10px;">Enter the code shared by a friend.</p>
+            <div class="day-section">
+                <div class="day-header">Join a Group</div>
+                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Enter the code shared by a friend.</p>
                 <input id="join-code" placeholder="6-Digit Code">
-                <button onclick="joinGroup()" class="secondary">Join with Code</button>
+                <button onclick="joinGroup()" class="outline" style="width:100%; font-size:14px; padding:16px;">Join with Code</button>
             </div>
             <div id="group-list"></div>
         </div>
 
-        <!-- Dashboard -->
-        <div id="section-dashboard" class="section">
-            <div id="sentiment-box">"A hungry comrade is a weary comrade. Fuel up!"</div>
-            <div class="people-counter">
-                <div class="counter-btn" onclick="changeGS(-1)">−</div>
-                <div class="counter-val" id="gs-val">1</div>
-                <div class="counter-btn" onclick="changeGS(1)">+</div>
+        <!-- ══════════════════ INVENTORY ══════════════════ -->
+        <div id="section-items" class="section">
+            <div id="item-editor">
+                <div class="day-header">Add Ingredient</div>
+                <label>Item Name</label><input type="text" id="base-name" placeholder="e.g. Rice, Beans, Sukuma" oninput="updateItemFoodHint()">
+                <div id="item-food-hint" style="margin-top:-10px; margin-bottom:12px; min-height:20px;"></div>
+                <label>Total Market Price (KSh)</label><input type="number" id="base-price" placeholder="0.00">
+                <label>Serves how many people?</label><input type="number" id="base-people" value="1" min="1">
+                <button id="save-item-btn" onclick="addInv()">Save to Cloud</button>
             </div>
-            <div id="daily-plan"></div>
+            <div style="margin-top:30px;" id="base-meal-list"></div>
         </div>
 
-        <!-- Inventory -->
-        <div id="section-inventory" class="section" style="display:none">
-            <div class="card">
-                <div class="card-title">Add Ingredient</div>
-                <input id="inv-name" placeholder="Item Name">
-                <input id="inv-price" type="number" placeholder="Total Price">
-                <input id="inv-pax" type="number" placeholder="Serves">
-                <button onclick="addInv()">Save to Cloud</button>
+        <!-- ══════════════════ COMBO BUILDER ══════════════════ -->
+        <div id="section-combos" class="section">
+            <div id="combo-live-preview">
+                <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Nutrition Preview</div>
+                <div class="nutri-strip" id="combo-nutri-strip"></div>
+                <div id="combo-ai-hint"></div>
             </div>
-            <div id="inventory-list"></div>
+
+            <label>Select items to combine:</label>
+            <div id="item-chips" style="margin-bottom:20px;"></div>
+
+            <label>Combination Name</label><input type="text" id="combo-name" placeholder="Rice &amp; Beans">
+            <label>Best served as:</label>
+            <select id="combo-time"><option value="Breakfast">Breakfast</option><option value="Lunch">Lunch</option><option value="Dinner">Dinner</option></select>
+            <label>Nutrition Vibe:</label>
+            <select id="combo-vibe"><option value="Normal">Normal</option><option value="Brain Power">🧠 Brain Power</option><option value="Heavy">💪 Heavy</option><option value="Energy">⚡ High Energy</option></select>
+            <button onclick="addCombo()">Save Combo</button>
+            <div style="margin-top:30px;" id="combo-list"></div>
         </div>
 
-        <!-- Combos -->
-        <div id="section-combos" class="section" style="display:none">
-            <div class="card">
-                <div class="card-title">Build Meal</div>
-                <div id="ingredient-chips"></div>
-                <input id="co-name" placeholder="Meal Name">
-                <select id="co-time"><option>Breakfast</option><option>Lunch</option><option>Dinner</option></select>
-                <button onclick="addCombo()">Save Combo</button>
+        <!-- ══════════════════ SMART DECISIONS ══════════════════ -->
+        <div id="section-decide" class="section">
+            <label>Budget Per Person (KSh)</label>
+            <input type="number" id="budget-input" placeholder="0.00" oninput="updateSuggestions()">
+            <label>Time Category:</label>
+            <select id="time-filter" onchange="updateSuggestions()"><option value="Breakfast">Breakfast</option><option value="Lunch">Lunch</option><option value="Dinner">Dinner</option></select>
+            <div id="suggestion-container" style="margin-top:25px;"></div>
+        </div>
+
+        <!-- ══════════════════ GROCERY ASSISTANT ══════════════════ -->
+        <div id="section-grocery" class="section">
+            <div class="day-header">Grocery Assistant</div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">How many times this week do you plan to eat each combo?</p>
+            <div id="grocery-plan-list"></div>
+            <button onclick="calculateGroceries()" style="margin-top:20px;">Calculate Bulk Needs</button>
+            <div id="grocery-result" style="margin-top:24px;"></div>
+
+            <div id="grocery-ai-block" style="display:none;">
+                <div class="grocery-ai-header">📊 Nutrition Insight</div>
+                <div id="grocery-ai-content"></div>
             </div>
-            <div id="combo-list"></div>
+        </div>
+
+    </div><!-- /content -->
+
+    <!-- ══════════════════ FLOATING AI CHAT ══════════════════ -->
+    <button id="ai-fab" onclick="toggleChat()" title="Ask your nutrition assistant">🤖</button>
+
+    <div id="ai-chat-panel">
+        <div class="ai-chat-topbar">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div class="ai-avatar">🤖</div>
+                <div>
+                    <div class="ai-chat-name">Nutrition Assistant</div>
+                    <div class="ai-chat-sub">Learns from your habits · suggestions only</div>
+                </div>
+            </div>
+            <span class="ai-close" onclick="toggleChat()">✕</span>
+        </div>
+        <div class="ai-chat-messages" id="ai-chat-messages">
+            <div class="ai-msg bot">👋 Hey Comrade! Ask me about calories, food balance, or what to eat. I learn from your habits!</div>
+        </div>
+        <div class="ai-quick-row">
+            <button class="ai-qchip" onclick="qChat('Is my diet balanced today?')">🥗 Balance?</button>
+            <button class="ai-qchip" onclick="qChat('How many calories today?')">🔥 Calories?</button>
+            <button class="ai-qchip" onclick="qChat('What should I eat for protein?')">💪 Protein tips</button>
+        </div>
+        <div class="ai-input-row">
+            <input type="text" id="ai-chat-input" placeholder="Ask anything..." onkeydown="if(event.key==='Enter') sendChat()">
+            <button onclick="sendChat()">Send</button>
         </div>
     </div>
 
     <script>
+        // ═══════════════════════════════════════════════════════
+        //  FIREBASE CONFIG & AUTH
+        // ═══════════════════════════════════════════════════════
         const cfg = { apiKey: "AIzaSyDzzNgX8oEq_pmLJwUk1MJ3404eaDl7Ge4", authDomain: "comradebite-c0265c98.firebaseapp.com", databaseURL: "https://comradebite-c0265c98-default-rtdb.firebaseio.com", projectId: "comradebite-c0265c98" };
         firebase.initializeApp(cfg);
         const db = firebase.database(), auth = firebase.auth();
-        let user = null, curCode = "", data = { inventory: {}, meals: {}, groupSize: 1 }, selectedIngs = new Set();
+        let user = null, curCode = "", data = { inventory: {}, meals: {}, groupSize: 1 };
         let isLogin = false;
 
         const urlParams = new URLSearchParams(window.location.search);
         if(urlParams.get('mode') === 'login') toggleAuth();
 
-        auth.onAuthStateChanged(u => { if(u) { user = u; document.getElementById('auth-overlay').style.display='none'; loadUser(); } else { document.getElementById('auth-overlay').style.display='flex'; } });
+        auth.onAuthStateChanged(u => { 
+            if(u) { user = u; document.getElementById('auth-overlay').style.display='none'; loadUser(); } 
+            else { document.getElementById('auth-overlay').style.display='flex'; } 
+        });
 
-        function toggleAuth() { isLogin = !isLogin; document.getElementById('auth-btn').innerText = isLogin ? "Login" : "Register"; document.getElementById('auth-desc').innerText = isLogin ? "Welcome back, Comrade." : "Join to start planning meals."; document.getElementById('auth-toggle').innerText = isLogin ? "register instead if you don't have an account" : "login instead if you have an account"; }
+        function toggleAuth() { 
+            isLogin = !isLogin; 
+            document.getElementById('auth-btn').innerText = isLogin ? "Login" : "Register"; 
+            document.getElementById('auth-desc').innerText = isLogin ? "Welcome back, Comrade." : "Join to start planning meals."; 
+            document.getElementById('auth-toggle').innerText = isLogin ? "register instead if you don't have an account" : "login instead if you have an account"; 
+        }
         async function handleAuth() {
             const e = document.getElementById('email').value, p = document.getElementById('password').value;
             try { if(isLogin) await auth.signInWithEmailAndPassword(e, p); else await auth.createUserWithEmailAndPassword(e, p); }
             catch(err) { document.getElementById('error').innerText = err.message; }
         }
 
-        function loadUser() { db.ref(`users/${user.uid}/groups`).on('value', s => { const g = s.val(); if(g) { curCode = Object.keys(g)[0]; syncGroup(); } else switchSection('group'); }); }
+        function loadUser() { 
+            db.ref(`users/${user.uid}/groups`).on('value', s => { 
+                const g = s.val(); 
+                if(g) { curCode = Object.keys(g)[0]; syncGroup(); } 
+                else switchSection('group'); 
+            }); 
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  CORE DATA (Mapped from Firebase)
+        // ═══════════════════════════════════════════════════════
+        let baseMeals    = [];
+        let combinations = [];
+        let eatenTodayIngredients = JSON.parse(localStorage.getItem('cb_v6_eaten_today') || '[]');
+        let currentDayPlan = JSON.parse(localStorage.getItem('cb_v6_plan') || '{}');
+        let selectedBaseNames = [];
+        let globalPeople = 1;
+
         function syncGroup() {
             if(!curCode) return;
             db.ref(`groups/${curCode}`).on('value', s => {
                 const v = s.val() || {};
                 data = { inventory: v.inventory || {}, meals: v.meals || {}, name: v.name || "None", groupSize: v.groupSize || 1 };
+                
+                // Map Firebase objects to arrays for the UI & AI
+                baseMeals = Object.entries(data.inventory).map(([id, val]) => ({ id, ...val }));
+                combinations = Object.entries(data.meals).map(([id, val]) => ({ id, ...val }));
+                globalPeople = data.groupSize;
+
                 document.getElementById('active-group-header').innerText = data.name;
-                document.getElementById('gs-val').innerText = data.groupSize;
-                renderDash(); renderInv(); renderCombos();
+                document.getElementById('global-people-val').innerText = globalPeople;
+                
+                render();
             });
         }
 
-        function switchSection(id) { document.querySelectorAll('.section').forEach(s => s.style.display='none'); document.getElementById('section-'+id).style.display='block'; document.getElementById('drawer').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); }
+        // ═══════════════════════════════════════════════════════
+        //  FOOD DATABASE & AI BEHAVIOR TRACKER
+        // ═══════════════════════════════════════════════════════
+        const FOOD_DB = {
+            'rice': { kcal:390, group:'carb', emoji:'🍚', label:'Carb' },
+            'ugali': { kcal:450, group:'carb', emoji:'🫓', label:'Carb' },
+            'beans': { kcal:390, group:'protein', emoji:'🫘', label:'Protein' },
+            'egg': { kcal:155, group:'protein', emoji:'🥚', label:'Protein' },
+            'eggs': { kcal:155, group:'protein', emoji:'🥚', label:'Protein' },
+            'sukuma': { kcal:50, group:'vegetable', emoji:'🥬', label:'Vegetable' },
+            'cabbage': { kcal:25, group:'vegetable', emoji:'🥦', label:'Vegetable' },
+            'beef': { kcal:600, group:'protein', emoji:'🥩', label:'Protein' },
+            'chicken': { kcal:495, group:'protein', emoji:'🍗', label:'Protein' },
+            'banana': { kcal:89, group:'fruit', emoji:'🍌', label:'Fruit' },
+            'chapati': { kcal:300, group:'carb', emoji:'🫓', label:'Carb' },
+        };
+        const vibeIcons = { "Normal":"", "Brain Power":"🧠", "Heavy":"💪", "Energy":"⚡" };
+
+        let ai = JSON.parse(localStorage.getItem('cb_ai_v6') || JSON.stringify({
+            history: [], commonMeals: {}, fruitVegStreak: 0, fruitVegMiss: 0,
+            waterToday: 0, waterDate: null, lastWaterRemind: null
+        }));
+        function saveAI() { localStorage.setItem('cb_ai_v6', JSON.stringify(ai)); }
+
+        // AI Helpers
+        function detectGroups(names) {
+            if (!names || !names.length) return [];
+            const groups = new Set();
+            const lower  = names.map(n => n.toLowerCase());
+            for (const [kw, d] of Object.entries(FOOD_DB)) if (lower.some(n => n.includes(kw))) groups.add(d.group);
+            return [...groups];
+        }
+        function detectKcal(names) {
+            if (!names || !names.length) return 0;
+            const lower = names.map(n => n.toLowerCase());
+            let total = 0, seen = new Set();
+            for (const [kw, d] of Object.entries(FOOD_DB)) {
+                const matched = lower.find(n => n.includes(kw));
+                if (matched && !seen.has(matched + d.group)) { total += d.kcal; seen.add(matched + d.group); }
+            }
+            return total;
+        }
+        function foodDataFor(name) {
+            const n = name.toLowerCase();
+            for (const [kw, d] of Object.entries(FOOD_DB)) if (n.includes(kw)) return { kw, ...d };
+            return null;
+        }
+        function hasFruitVeg(groups) { return groups.includes('fruit') || groups.includes('vegetable') || groups.includes('mixed'); }
+        function balanceScore(groups) {
+            const targets = ['carb','protein','vegetable','fruit'];
+            const hit = targets.filter(g => groups.includes(g) || groups.includes('mixed')).length;
+            return Math.round((hit / targets.length) * 100);
+        }
+        function nutriPillHTML(group, kcal) {
+            const gmap = { carb:'carb', protein:'protein', vegetable:'vegetable', fruit:'fruit', dairy:'dairy', mixed:'mixed', other:'active' };
+            const glabel = { carb:'🍚 Carbs', protein:'💪 Protein', vegetable:'🥬 Veg', fruit:'🍎 Fruit', dairy:'🥛 Dairy', mixed:'🥘 Mixed', other:'☕ Other' };
+            const groups_html = [...new Set(group)].map(g => `<span class="nutri-pill ${gmap[g] || 'active'}">${glabel[g] || g}</span>`).join('');
+            const kcal_html = kcal > 0 ? `<span class="nutri-pill kcal">🔥 ~${kcal} kcal</span>` : '';
+            return groups_html + kcal_html;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  WATER TRACKER
+        // ═══════════════════════════════════════════════════════
+        function checkWaterDate() {
+            const today = new Date().toLocaleDateString();
+            if (ai.waterDate !== today) { ai.waterToday = 0; ai.waterDate = today; saveAI(); }
+        }
+        function logWaterGlass() {
+            checkWaterDate();
+            if (ai.waterToday < 12) {
+                ai.waterToday++; saveAI(); renderWaterBlock(); renderWellnessRow(); updateTopWater();
+                if (ai.waterToday === 8) showToast('💧 8 glasses! Amazing hydration today! 🎉', 'success');
+            }
+        }
+        function updateTopWater() {
+            checkWaterDate();
+            const el = document.getElementById('top-water');
+            if (el) { el.textContent = `💧 ${ai.waterToday}/8`; el.style.color = ai.waterToday >= 8 ? 'var(--emerald-accent)' : 'var(--cyan-accent)'; }
+        }
+        function focusWater() { switchSection('dashboard'); const wb = document.getElementById('water-block'); if (wb) { wb.style.display = 'block'; wb.scrollIntoView({ behavior:'smooth', block:'center' }); } }
+
+        // ═══════════════════════════════════════════════════════
+        //  GROUP MANAGEMENT & FIREBASE ACTIONS
+        // ═══════════════════════════════════════════════════════
         function createGroup() {
-            const n = document.getElementById('new-group-name').value; if(!n) return;
+            const n = document.getElementById('new-group-name').value; if(!n) return showToast("Name required", "danger");
             const c = Math.random().toString(36).substring(2, 8).toUpperCase();
             db.ref(`groups/${c}`).set({ name: n, owner: user.uid, members: { [user.uid]: true }, groupSize: 1 });
-            db.ref(`users/${user.uid}/groups/${c}`).set({ name: n }).then(() => switchSection('dashboard'));
+            db.ref(`users/${user.uid}/groups/${c}`).set({ name: n }).then(() => { showToast("Group created!"); switchSection('dashboard'); });
         }
         function joinGroup() {
             const c = document.getElementById('join-code').value.toUpperCase();
-            db.ref(`groups/${c}`).once('value', s => { if(s.exists()) { db.ref(`groups/${c}/members/${user.uid}`).set(true); db.ref(`users/${user.uid}/groups/${c}`).set({ name: s.val().name }).then(() => switchSection('dashboard')); } });
-        }
-        function changeGS(d) { db.ref(`groups/${curCode}/groupSize`).set(Math.max(1, data.groupSize + d)); }
-        function addInv() { const n = document.getElementById('inv-name').value, p = document.getElementById('inv-price').value, s = document.getElementById('inv-pax').value; if(n && p && s) db.ref(`groups/${curCode}/inventory`).push({ name: n, totalPrice: parseFloat(p), numPeople: parseInt(s) }); }
-        function addCombo() { const n = document.getElementById('co-name').value, t = document.getElementById('co-time').value; if(n && selectedIngs.size) db.ref(`groups/${curCode}/meals`).push({ name: n, baseNames: Array.from(selectedIngs), targetTime: t }); }
-        function renderDash() {
-            const cont = document.getElementById('daily-plan'); cont.innerHTML = "<h3>Daily Plan</h3>";
-            ["Breakfast", "Lunch", "Dinner"].forEach(t => {
-                const meals = Object.values(data.meals).filter(m => m.targetTime === t);
-                const m = meals[Math.floor(Math.random() * meals.length)];
-                let cost = 0; if(m) m.baseNames.forEach(n => { const it = Object.values(data.inventory).find(i => i.name === n); if(it) cost += (it.totalPrice / it.numPeople) * data.groupSize; });
-                cont.innerHTML += `<div class="plan-slot"><div class="slot-time">${t}</div><b>${m ? m.name : 'No meal set'}</b><br><small>Total Cost: KSh ${Math.round(cost)}</small></div>`;
+            db.ref(`groups/${c}`).once('value', s => { 
+                if(s.exists()) { 
+                    db.ref(`groups/${c}/members/${user.uid}`).set(true); 
+                    db.ref(`users/${user.uid}/groups/${c}`).set({ name: s.val().name }).then(() => { showToast("Joined group!"); switchSection('dashboard'); }); 
+                } else showToast("Invalid code", "danger");
             });
         }
-        function renderInv() { const l = document.getElementById('inventory-list'); l.innerHTML = ""; Object.entries(data.inventory).forEach(([k,v]) => { l.innerHTML += `<div class="card"><b>${v.name}</b><br><small>KSh ${v.totalPrice} serves ${v.numPeople}</small></div>`; }); }
-        function renderCombos() {
-            const chips = document.getElementById('ingredient-chips'); chips.innerHTML = "";
-            const unique = [...new Set(Object.values(data.inventory).map(x => x.name))];
-            unique.forEach(n => { const c = document.createElement('div'); c.className = `chip ${selectedIngs.has(n)?'selected':''}`; c.innerText = n; c.onclick = () => { selectedIngs.has(n)?selectedIngs.delete(n):selectedIngs.add(n); renderCombos(); }; chips.appendChild(c); });
-            const list = document.getElementById('combo-list'); list.innerHTML = "";
-            Object.entries(data.meals).forEach(([k,v]) => { list.innerHTML += `<div class="card"><b>${v.name}</b><br><small>${v.targetTime} • ${v.baseNames.join(' + ')}</small></div>`; });
+        function changeGS(d) { db.ref(`groups/${curCode}/groupSize`).set(Math.max(1, globalPeople + d)); }
+        
+        function addInv() { 
+            const n = document.getElementById('base-name').value.trim();
+            const p = parseFloat(document.getElementById('base-price').value);
+            const s = parseInt(document.getElementById('base-people').value);
+            if (!n) return showToast("Item name is required", "danger");
+            if (isNaN(p) || p < 0) return showToast("Valid price is required", "danger");
+            if (isNaN(s) || s < 1) return showToast("People must be at least 1", "danger");
+            
+            db.ref(`groups/${curCode}/inventory`).push({ name: n, totalPrice: p, numPeople: s, pricePerPerson: p/s })
+                .then(() => {
+                    showToast("Saved to cloud!");
+                    document.getElementById('base-name').value = '';
+                    document.getElementById('base-price').value = '';
+                    document.getElementById('item-food-hint').innerHTML = '';
+                });
+        }
+
+        function deleteInv(id, name) {
+            const used = combinations.filter(c => c.baseNames.includes(name));
+            if (used.length > 0) {
+                if(!confirm(`Warning: "${name}" is used in ${used.length} combo(s). Deleting it will break those combos. Continue?`)) return;
+            } else {
+                if(!confirm(`Delete ${name}?`)) return;
+            }
+            db.ref(`groups/${curCode}/inventory/${id}`).remove();
+        }
+
+        function addCombo() { 
+            const n = document.getElementById('combo-name').value.trim();
+            const t = document.getElementById('combo-time').value;
+            const v = document.getElementById('combo-vibe').value;
+            if(!n) return showToast("Combo name is required", "danger");
+            if(selectedBaseNames.length === 0) return showToast("Select at least one ingredient", "danger");
+            
+            db.ref(`groups/${curCode}/meals`).push({ name: n, baseNames: Array.from(selectedBaseNames), targetTime: t, vibe: v, frequency: 0 })
+                .then(() => {
+                    showToast("Combo saved!");
+                    document.getElementById('combo-name').value = '';
+                    selectedBaseNames = [];
+                    render();
+                });
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  AI INTERNET CHECKER
+        // ═══════════════════════════════════════════════════════
+        function isOffline() { return !navigator.onLine; }
+        
+        window.addEventListener('offline', () => {
+            showToast("You are offline. AI features disabled.", "danger");
+            render();
+            document.getElementById('ai-chat-panel').classList.remove('open');
+        });
+        window.addEventListener('online', () => {
+            showToast("Back online! AI is ready.", "success");
+            render();
+        });
+
+        // ═══════════════════════════════════════════════════════
+        //  RENDER
+        // ═══════════════════════════════════════════════════════
+        function render() {
+            renderDashboard();
+
+            // Inventory
+            const ilist = document.getElementById('base-meal-list');
+            ilist.innerHTML = baseMeals.length ? '<div class="day-header">INVENTORY &amp; TRENDS</div>' : '';
+            baseMeals.sort((a,b) => a.name.localeCompare(b.name)).forEach(m => {
+                const fd = foodDataFor(m.name);
+                const groupPill = fd ? `<span class="nutri-pill ${fd.group}">${fd.emoji} ${fd.label}</span>` : '';
+                ilist.innerHTML += `<div style="padding:14px; border-bottom:1px solid var(--slate-700); display:flex; justify-content:space-between; align-items:center; font-size:14px;">
+                    <div>${m.name} <small style="color:var(--text-muted)">(${m.numPeople}p)</small>
+                        <div style="margin-top:4px;">${groupPill}</div>
+                        <b style="color:var(--cyan-accent);">KSh ${m.totalPrice}</b>
+                    </div>
+                    <button class="outline" style="padding:4px 8px; color:var(--danger); border-color:var(--danger);" onclick="deleteInv('${m.id}', '${m.name}')">Del</button>
+                </div>`;
+            });
+
+            // Combos
+            const clist = document.getElementById('combo-list');
+            if (clist) clist.innerHTML = combinations.map(c => {
+                const groups = detectGroups(c.baseNames);
+                const kcal   = detectKcal(c.baseNames);
+                return `<div style="padding:13px; border-radius:13px; background:var(--bg-card); border:1px solid var(--glass-border); margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
+                        <b>${vibeIcons[c.vibe] || ''} ${c.name}</b> <small style="color:var(--text-muted);">${c.targetTime}</small>
+                    </div>
+                    <div class="nutri-strip">${nutriPillHTML(groups, kcal)}</div>
+                    <small style="color:var(--text-muted);">${c.baseNames.join(' · ')}</small>
+                </div>`;
+            }).join('');
+
+            // Chips
+            const chips = document.getElementById('item-chips');
+            if (chips) {
+                chips.innerHTML = '';
+                [...new Set(baseMeals.map(m => m.name))].forEach(name => {
+                    chips.innerHTML += `<div class="chip ${selectedBaseNames.includes(name) ? 'selected' : ''}" onclick="toggleChip('${name}')">${name}</div>`;
+                });
+            }
+
+            // Grocery plan list
+            const glist = document.getElementById('grocery-plan-list');
+            if (glist) {
+                glist.innerHTML = combinations.map(c => {
+                    return `<div style="padding:12px; margin-bottom:10px; background:var(--bg-card); border:1px solid var(--glass-border); border-radius:13px; display:flex; justify-content:space-between; align-items:center;">
+                        <div><b>${c.name}</b> <small style="color:var(--text-muted);">${c.targetTime}</small></div>
+                        <input type="number" class="grocery-input" data-id="${c.id}" value="0" min="0" style="width:60px; padding:6px; margin:0; text-align:center;" onchange="document.getElementById('grocery-ai-block').style.display='none'">
+                    </div>`;
+                }).join('');
+            }
+
+            renderComboLivePreview();
+            renderWellnessRow();
+            renderWaterBlock();
+            updateTopWater();
+            updateSuggestions();
+            updateAIFab();
+        }
+
+        function renderDashboard() {
+            if (Object.keys(currentDayPlan).length === 0 && combinations.length > 0) {
+                ['Breakfast','Lunch','Dinner'].forEach(time => {
+                    const sorted = combinations.filter(c => c.targetTime === time);
+                    if (sorted.length > 0) currentDayPlan[time] = sorted[Math.floor(Math.random()*sorted.length)].id;
+                });
+                localStorage.setItem('cb_v6_plan', JSON.stringify(currentDayPlan));
+            }
+            ['breakfast-slot','lunch-slot','dinner-slot'].forEach((divId, i) => renderSlotUI(divId, ['Breakfast','Lunch','Dinner'][i]));
+
+            const sum = document.getElementById('eaten-summary');
+            if (sum) sum.innerHTML = eatenTodayIngredients.length ? `
+                <div style="border:1px dashed var(--slate-700); background:transparent; padding:14px; border-radius:12px;">
+                    <small style="color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Eaten Today:</small>
+                    <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px;">${eatenTodayIngredients.map(i => `<span style="color:var(--cyan-accent); font-size:12px;">✅ ${i}</span>`).join('')}</div>
+                    <button class="outline" style="margin-top:12px; width:100%; border-color:var(--danger); color:var(--danger);" onclick="resetDay()">Reset For New Day</button>
+                </div>` : '';
+
+            // AI Hint - online only
+            const hintEl = document.getElementById('dashboard-ai-hint');
+            if (hintEl) {
+                if (isOffline()) {
+                    hintEl.innerHTML = `<div class="ai-hint" style="margin-top:16px;"><span>📡 AI Assistant requires an internet connection.</span></div>`;
+                } else {
+                    const { kcal, groups } = dayNutrition();
+                    let hintHtml = '';
+                    if (!hasFruitVeg(groups) && groups.length > 0) hintHtml = `<span class="ai-hint-icon">🥬</span><span>No fruits or veggies in today's plan. Add some!</span>`;
+                    else if (!groups.includes('protein') && groups.length > 0) hintHtml = `<span class="ai-hint-icon">💪</span><span>Today's plan has no protein. Try adding beans or eggs.</span>`;
+                    
+                    hintEl.innerHTML = hintHtml ? `<div class="ai-hint" style="margin-top:16px;">${hintHtml}</div>` : '';
+                }
+            }
+        }
+
+        function renderSlotUI(divId, type) {
+            const slot  = document.getElementById(divId);
+            const combo = combinations.find(c => c.id === currentDayPlan[type]);
+            if (!combo) { slot.innerHTML = `<div style="padding:18px; text-align:center; color:var(--text-muted); border:1px dashed var(--slate-700); border-radius:12px;">No combo found. Add some!</div>`; return; }
+            
+            const groups = detectGroups(combo.baseNames);
+            const kcal   = detectKcal(combo.baseNames);
+            let cost = 0;
+            combo.baseNames.forEach(n => { const b = baseMeals.find(x => x.name === n); if(b) cost += (b.totalPrice/b.numPeople) * globalPeople; });
+            
+            slot.innerHTML = `
+                <div style="background:var(--bg-card); padding:15px; border-radius:12px; border:1px solid var(--glass-border);">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <div style="font-size:16px; font-weight:800; margin-bottom:4px;">${combo.name}</div>
+                            <div style="color:var(--cyan-accent); font-weight:700; margin-bottom:6px;">KSh ${cost.toFixed(0)} <small style="color:var(--text-muted); font-weight:400;">total</small></div>
+                            <div class="nutri-strip">${nutriPillHTML(groups, kcal)}</div>
+                        </div>
+                        <button style="padding:6px 12px; font-size:11px; flex-shrink:0; margin-left:8px;" onclick="markEaten('${type}')">EAT THIS</button>
+                    </div>
+                </div>`;
+        }
+
+        function dayNutrition() {
+            let kcal = 0; const groups = new Set();
+            ['Breakfast','Lunch','Dinner'].forEach(t => {
+                const c = combinations.find(x => x.id === currentDayPlan[t]);
+                if (c) { kcal += detectKcal(c.baseNames); detectGroups(c.baseNames).forEach(g => groups.add(g)); }
+            });
+            return { kcal, groups: [...groups] };
+        }
+
+        function renderWellnessRow() {
+            const row = document.getElementById('wellness-row');
+            if (!row) return;
+            const { kcal, groups } = dayNutrition();
+            const bal = balanceScore(groups);
+            row.innerHTML = `
+                <div class="wellness-cell"><div class="wc-val" style="color:var(--cyan-accent);">${kcal>0?kcal:'—'}</div><div class="wc-lbl">🔥 kcal</div></div>
+                <div class="wellness-cell"><div class="wc-val" style="color:var(--emerald-accent);">${groups.length>0?bal+'%':'—'}</div><div class="wc-lbl">🥗 balance</div></div>
+                <div class="wellness-cell" onclick="logWaterGlass()" style="cursor:pointer;"><div class="wc-val" style="color:var(--cyan-accent);">${ai.waterToday}/8</div><div class="wc-lbl">💧 water</div></div>`;
+        }
+
+        function renderWaterBlock() {
+            const block = document.getElementById('water-block');
+            if (!block) return;
+            block.style.display = 'block';
+            document.getElementById('water-count-lbl').textContent = `${ai.waterToday}/8 glasses`;
+            const row = document.getElementById('water-glasses-row');
+            if (row) row.innerHTML = Array(8).fill(0).map((_,i) => `<span class="wglass ${i < ai.waterToday ? 'filled' : ''}" onclick="logWaterGlass()">💧</span>`).join('');
+        }
+
+        function toggleChip(name) {
+            const idx = selectedBaseNames.indexOf(name);
+            if (idx > -1) selectedBaseNames.splice(idx,1); else selectedBaseNames.push(name);
+            render();
+        }
+
+        function renderComboLivePreview() {
+            const preview = document.getElementById('combo-live-preview');
+            const strip   = document.getElementById('combo-nutri-strip');
+            const hintEl  = document.getElementById('combo-ai-hint');
+            if (!preview || !strip) return;
+            if (selectedBaseNames.length === 0) { preview.classList.remove('show'); return; }
+            preview.classList.add('show');
+            
+            const groups = detectGroups(selectedBaseNames);
+            const kcal   = detectKcal(selectedBaseNames);
+            strip.innerHTML = nutriPillHTML(groups, kcal);
+
+            if (isOffline()) {
+                hintEl.innerHTML = `<div class="ai-hint"><span>📡 AI Preview requires internet.</span></div>`;
+            } else {
+                const missing = ['protein','vegetable','fruit'].filter(g => !groups.includes(g) && !groups.includes('mixed'));
+                if (missing.length > 0 && hintEl) hintEl.innerHTML = `<div class="ai-hint"><span class="ai-hint-icon">💡</span><span>Add a ${missing[0]} for a complete meal.</span></div>`;
+                else if (hintEl) hintEl.innerHTML = `<div class="ai-hint"><span class="ai-hint-icon">✅</span><span>Well-rounded combo!</span></div>`;
+            }
+        }
+
+        function calculateGroceries() {
+            const inputs = document.querySelectorAll('.grocery-input');
+            let bulkSum = {}, weekGroups = new Set();
+            inputs.forEach(inp => {
+                const count = parseInt(inp.value) || 0;
+                if (count > 0) {
+                    const combo = combinations.find(c => c.id == inp.dataset.id);
+                    if (!combo) return;
+                    combo.baseNames.forEach(name => { bulkSum[name] = (bulkSum[name] || 0) + count; });
+                    detectGroups(combo.baseNames).forEach(g => weekGroups.add(g));
+                }
+            });
+            const resDiv = document.getElementById('grocery-result');
+            if (Object.keys(bulkSum).length === 0) return resDiv.innerHTML = '<p style="color:var(--danger)">Enter some counts above first!</p>';
+            
+            let html = '<div style="background:var(--bg-card); border-radius:14px; padding:14px;">';
+            for (let name in bulkSum) {
+                const b = baseMeals.find(x => x.name === name);
+                const price = b ? (b.totalPrice/b.numPeople)*bulkSum[name]*globalPeople : 0;
+                html += `<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span>🛒 <b>${name}</b> ×${bulkSum[name]}</span> <span style="color:var(--cyan-accent);">KSh ${price.toFixed(0)}</span></div>`;
+            }
+            resDiv.innerHTML = html + '</div>';
+
+            const aiBlock = document.getElementById('grocery-ai-block');
+            const aiContent = document.getElementById('grocery-ai-content');
+            if (aiBlock && aiContent) {
+                aiBlock.style.display = 'block';
+                if (isOffline()) {
+                    aiContent.innerHTML = `📡 AI Insights require an internet connection.`;
+                } else {
+                    const missingG = ['carb','protein','vegetable','fruit'].filter(g => !weekGroups.has(g));
+                    if (missingG.length === 0) aiContent.innerHTML = `<span style="color:var(--emerald-accent);">✅ Well-balanced weekly shop! covers all major groups.</span>`;
+                    else aiContent.innerHTML = `<span style="color:var(--amber);">⚠️ Missing: <b>${missingG.join(', ')}</b>. Consider adding some.</span>`;
+                }
+            }
+        }
+
+        function updateSuggestions() {
+            const el = document.getElementById('suggestion-container');
+            if (!el) return;
+            const budget = parseFloat(document.getElementById('budget-input').value) || 999999;
+            const time   = document.getElementById('time-filter').value;
+            const html = combinations.filter(c => c.targetTime === time).map(c => {
+                let cost = 0; c.baseNames.forEach(n => { const b = baseMeals.find(x => x.name === n); if(b) cost += (b.totalPrice/b.numPeople)*globalPeople; });
+                return { c, cost };
+            }).filter(x => (x.cost/globalPeople) <= budget).map(x => `
+                <div style="background:var(--bg-card); padding:13px; border-radius:12px; border:1px solid var(--glass-border); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div><b>${x.c.name}</b><br><small style="color:var(--cyan-accent);">KSh ${(x.cost/globalPeople).toFixed(0)} / person</small></div>
+                    <button class="outline" style="padding:6px 12px;" onclick="currentDayPlan['${x.c.targetTime}']='${x.c.id}'; localStorage.setItem('cb_v6_plan', JSON.stringify(currentDayPlan)); render();">Select</button>
+                </div>`).join('');
+            el.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">No matches for this budget.</div>';
+        }
+
+        function updateItemFoodHint() {
+            const n = document.getElementById('base-name').value.trim();
+            const h = document.getElementById('item-food-hint');
+            if (!h) return;
+            if (isOffline()) { h.innerHTML = ''; return; }
+            const fd = foodDataFor(n);
+            if (fd) h.innerHTML = `<span class="nutri-pill ${fd.group}">${fd.emoji} ${fd.label}</span>`;
+            else h.innerHTML = `<span class="nutri-pill active">🍽️ Custom item</span>`;
+        }
+
+        function markEaten(type) {
+            const combo = combinations.find(c => c.id === currentDayPlan[type]);
+            if (!combo) return;
+            combo.baseNames.forEach(n => { if (!eatenTodayIngredients.includes(n)) eatenTodayIngredients.push(n); });
+            localStorage.setItem('cb_v6_eaten_today', JSON.stringify(eatenTodayIngredients));
+            
+            ai.history.push({ date: new Date().toLocaleDateString(), meal: combo.name });
+            saveAI(); showToast(`✅ "${combo.name}" marked as eaten!`, 'success'); render();
+        }
+        function resetDay() { eatenTodayIngredients = []; currentDayPlan = {}; localStorage.setItem('cb_v6_eaten_today', '[]'); localStorage.setItem('cb_v6_plan', '{}'); render(); }
+        function refreshSuggestions() { currentDayPlan = {}; localStorage.setItem('cb_v6_plan', '{}'); render(); }
+
+        // ═══════════════════════════════════════════════════════
+        //  UI HELPERS & CHAT
+        // ═══════════════════════════════════════════════════════
+        function toggleTheme() {
+            const light = document.getElementById('theme-toggle').checked;
+            document.body.setAttribute('data-theme', light ? 'light' : 'dark');
+            localStorage.setItem('cb_theme', light ? 'light' : 'dark');
+        }
+        function switchSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.getElementById('section-' + id).classList.add('active');
+            document.getElementById('nav-' + id).classList.add('active');
+            if (document.getElementById('drawer').classList.contains('active')) toggleDrawer();
+            render();
         }
         function toggleDrawer() { document.getElementById('drawer').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+        
+        function showToast(msg, type='info') {
+            const old = document.getElementById('ai-toast'); if (old) old.remove();
+            const colors = { info:'var(--cyan-accent)', success:'var(--emerald-accent)', water:'#60a5fa', warning:'var(--amber)', danger:'var(--danger)' };
+            const t = document.createElement('div'); t.id = 'ai-toast';
+            t.style.cssText = `position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--bg-drawer);border:1px solid ${colors[type]||colors.info};color:var(--text-main);padding:13px 20px;border-radius:14px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,0.4);animation:toastIn 0.35s ease;`;
+            t.innerHTML = msg; document.body.appendChild(t); setTimeout(() => { if (t.parentNode) t.remove(); }, 3000);
+        }
+
+        function updateAIFab() {
+            const fab = document.getElementById('ai-fab');
+            if(isOffline()) { fab.classList.add('offline'); fab.title = "Offline"; } 
+            else { fab.classList.remove('offline'); fab.title = "Ask your nutrition assistant"; }
+        }
+
+        function toggleChat() {
+            if(isOffline()) return showToast("Cannot open chat: No internet connection.", "danger");
+            document.getElementById('ai-chat-panel').classList.toggle('open');
+        }
+        function sendChat() {
+            if(isOffline()) return showToast("Offline.", "danger");
+            const input = document.getElementById('ai-chat-input');
+            const msgs  = document.getElementById('ai-chat-messages');
+            const q = input.value.trim(); if (!q) return;
+            msgs.innerHTML += `<div class="ai-msg user">${q}</div>`;
+            input.value = ''; msgs.scrollTop = msgs.scrollHeight;
+            setTimeout(() => { msgs.innerHTML += `<div class="ai-msg bot">${aiRespond(q)}</div>`; msgs.scrollTop = msgs.scrollHeight; }, 400);
+        }
+        function qChat(q) { const input = document.getElementById('ai-chat-input'); if (input) { input.value = q; sendChat(); } }
+        function aiRespond(query) {
+            const q = query.toLowerCase().trim();
+            if (q.includes('balance')) return `🥗 Focus on Carbs, Protein, and Veggies!`;
+            if (q.includes('calorie')) return `🔥 You can view calorie estimates in the Meal Inventory!`;
+            if (q.includes('protein')) return '💪 Try Beans, Eggs, or Beef!';
+            return `🤖 I am a local AI assistant. I can give basic nutrition tips!`;
+        }
+
     </script>
 </body>
 </html>

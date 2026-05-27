@@ -13,15 +13,16 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.comradebite.data.MealDatabase
 import com.comradebite.data.MealRepository
 import com.comradebite.notifications.NotificationHelper
 import com.comradebite.ui.theme.ComradeBiteTheme
 import com.comradebite.ui.screens.MainScreen
+import com.comradebite.ui.screens.SplashScreen
 import com.comradebite.viewmodel.MealViewModel
 import com.comradebite.viewmodel.ViewModelFactory
 
@@ -44,6 +45,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Handle the system splash screen transition
+        installSplashScreen()
+
         super.onCreate(savedInstanceState)
         
         NotificationHelper.createNotificationChannel(this)
@@ -51,13 +55,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+            var showSplash by remember { mutableStateOf(true) }
             
             ComradeBiteTheme(darkTheme = isDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreen(viewModel)
+                    if (showSplash) {
+                        SplashScreen(onTimeout = { showSplash = false })
+                    } else {
+                        MainScreen(viewModel)
+                    }
                 }
             }
         }

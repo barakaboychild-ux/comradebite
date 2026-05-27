@@ -15,6 +15,11 @@ object NotificationHelper {
     private const val CHANNEL_ID = "meal_reminders"
     private const val CHANNEL_NAME = "Meal Reminders"
 
+    // Alarm IDs - FIXED to prevent spamming
+    const val ID_BREAKFAST = 100
+    const val ID_LUNCH = 101
+    const val ID_DINNER = 102
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val descriptionText = "Notifications for meal times"
@@ -29,15 +34,16 @@ object NotificationHelper {
     }
 
     fun scheduleMealReminders(context: Context) {
-        scheduleAlarm(context, 100, MealViewModel.BREAKFAST_TIME.hour, MealViewModel.BREAKFAST_TIME.minute, "Breakfast Time! Comrade, fuel up for the day.")
-        scheduleAlarm(context, 101, MealViewModel.LUNCH_TIME.hour, MealViewModel.LUNCH_TIME.minute, "Lunch Time! Take a break and grab a bite.")
-        scheduleAlarm(context, 102, MealViewModel.DINNER_TIME.hour, MealViewModel.DINNER_TIME.minute, "Dinner Time! The day is ending, enjoy your meal.")
+        scheduleAlarm(context, ID_BREAKFAST, MealViewModel.BREAKFAST_TIME.hour, MealViewModel.BREAKFAST_TIME.minute, "Breakfast Time! Comrade, fuel up for the day.")
+        scheduleAlarm(context, ID_LUNCH, MealViewModel.LUNCH_TIME.hour, MealViewModel.LUNCH_TIME.minute, "Lunch Time! Take a break and grab a bite.")
+        scheduleAlarm(context, ID_DINNER, MealViewModel.DINNER_TIME.hour, MealViewModel.DINNER_TIME.minute, "Dinner Time! The day is ending, enjoy your meal.")
     }
 
     private fun scheduleAlarm(context: Context, id: Int, hour: Int, minute: Int, message: String) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, MealReminderReceiver::class.java).apply {
             putExtra("message", message)
+            putExtra("alarm_id", id)
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context, id, intent,
@@ -45,11 +51,13 @@ object NotificationHelper {
         )
 
         val calendar = Calendar.getInstance().apply {
-            timeInMillis = System.currentTimeMillis()
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
-            if (before(Calendar.getInstance())) {
+            set(Calendar.MILLISECOND, 0) // IMPORTANT: Clear milliseconds to avoid immediate triggering
+            
+            // If the time has already passed today, schedule for tomorrow strictly
+            if (timeInMillis <= System.currentTimeMillis()) {
                 add(Calendar.DAY_OF_MONTH, 1)
             }
         }
@@ -63,6 +71,7 @@ object NotificationHelper {
                         pendingIntent
                     )
                 } else {
+                    // Fallback to non-exact but reliable alarm
                     alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
                         calendar.timeInMillis,
@@ -76,7 +85,14 @@ object NotificationHelper {
                     pendingIntent
                 )
             }
-            Log.d("NotificationHelper", "Scheduled alarm for $hour:$minute")
+            Log.d("NotificationHelper", "Scheduled alarm $id for ${calendar.time}")
+        } catch (e: SecurityException) {
+            // Android 14+ safety fallback
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                calendar.timeInMillis,
+                pendingIntent
+            )
         } catch (e: Exception) {
             Log.e("NotificationHelper", "Failed to schedule alarm", e)
         }

@@ -12,11 +12,14 @@ import com.comradebite.R
 class MealReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val message = intent.getStringExtra("message") ?: "Time for a meal, Comrade!"
+        val alarmId = intent.getIntExtra("alarm_id", 0)
         
         // Show the notification
-        val notificationIntent = Intent(context, MainActivity::class.java)
+        val notificationIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
         val pendingIntent = PendingIntent.getActivity(
-            context, 0, notificationIntent,
+            context, alarmId, notificationIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -30,9 +33,12 @@ class MealReminderReceiver : BroadcastReceiver() {
             .build()
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        
+        // CRITICAL FIX: Use fixed alarmId (100, 101, 102) to prevent spamming multiple notifications.
+        // New notifications will overwrite the old ones for the same meal type.
+        notificationManager.notify(alarmId, notification)
 
-        // IMPORTANT: Alarms are one-shot. Reschedule for the next day/meal automatically.
+        // Reschedule for tomorrow/next meal cycle
         NotificationHelper.scheduleMealReminders(context)
     }
 }

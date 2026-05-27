@@ -38,7 +38,6 @@ abstract class MealDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance

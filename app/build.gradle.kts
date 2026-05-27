@@ -23,6 +23,22 @@ android {
         }
     }
 
+    flavorDimensions += "version"
+    productFlavors {
+        create("v1") {
+            dimension = "version"
+            applicationId = "com.comradebite"
+            versionName = "1.0"
+            manifestPlaceholders["appName"] = "ComradeBite"
+        }
+        create("v2") {
+            dimension = "version"
+            applicationId = "com.comradebite.v2"
+            versionName = "2.0"
+            manifestPlaceholders["appName"] = "ComradeBite 2.0"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -60,6 +76,9 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("com.google.code.gson:gson:2.11.0")
+    
+    // Core Splashscreen
+    implementation("androidx.core:core-splashscreen:1.0.1")
     
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.10.0"))

@@ -21,7 +21,9 @@ fun TimetableScreen(viewModel: MealViewModel) {
     val weeklyPlan by viewModel.weeklyTimetable.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     
-    val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    // Updated to start with Sunday
+    val days = listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+    val times = listOf("Breakfast", "Lunch", "Dinner")
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -54,7 +56,8 @@ fun TimetableScreen(viewModel: MealViewModel) {
                         )
                         Spacer(Modifier.height(8.dp))
                         
-                        dayPlan.forEach { (time, combo) ->
+                        times.forEach { time ->
+                            val combo = dayPlan[time]
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween

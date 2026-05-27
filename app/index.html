@@ -1,3 +1,89 @@
+        // --- Offline Mode Queue ---
+        let offlineQueue = [];
+        window.addEventListener('online', processOfflineQueue);
+
+        function processOfflineQueue() {
+            if (!navigator.onLine || offlineQueue.length === 0) return;
+            offlineQueue.forEach(action => action());
+            offlineQueue = [];
+        }
+
+        function safeDbPush(ref, data) {
+            if (navigator.onLine) {
+                db.ref(ref).push(data);
+            } else {
+                offlineQueue.push(() => db.ref(ref).push(data));
+                alert('No internet. Your change will sync when you are back online.');
+            }
+        }
+
+        function safeDbUpdate(ref, data) {
+            if (navigator.onLine) {
+                db.ref(ref).update(data);
+            } else {
+                offlineQueue.push(() => db.ref(ref).update(data));
+                alert('No internet. Your change will sync when you are back online.');
+            }
+        }
+        // --- Decision Screen Plan Integration ---
+        function replaceInTodaysPlan(mealName) {
+            // For demo: replace the first meal in daily plan with selected meal
+            // In real app, would update the plan in Firebase
+            alert('Replaced today\'s plan with: ' + mealName);
+            // TODO: Implement actual plan update logic
+        }
+        <!-- Grocery Assistant -->
+        <div id="section-grocery" class="section" style="display:none">
+            <div class="card">
+                <div class="card-title">Grocery Assistant</div>
+                <button onclick="generateFromPlan()" style="margin-bottom: 10px; background: var(--emerald-accent); color: #fff;">Generate from Weekly Plan</button>
+                <div id="grocery-plan-list"></div>
+                <button onclick="calculateGroceries()" style="margin-top: 20px;">Calculate Bulk Needs</button>
+                <div id="grocery-result" style="margin-top: 30px;"></div>
+            </div>
+        </div>
+// --- Plan-Based Shopping Logic ---
+function generateFromPlan() {
+    // Example: Assume weeklyPlan is an object { day: { breakfast: mealName, lunch: mealName, dinner: mealName } }
+    // and data.meals[mealName] has baseNames (ingredients)
+    // For demo, generate a fake plan for 7 days using available combos
+    let plan = [];
+    const combos = Object.values(data.meals);
+    for (let i = 0; i < 7; i++) {
+        ['Breakfast', 'Lunch', 'Dinner'].forEach(time => {
+            const meal = combos.find(m => m.targetTime === time);
+            if (meal) plan.push(meal);
+        });
+    }
+    // Count needed ingredients
+    let needs = {};
+    plan.forEach(m => m.baseNames.forEach(n => {
+        needs[n] = (needs[n] || 0) + 1;
+    }));
+    // Fill grocery-plan-list with these needs
+    const l = document.getElementById('grocery-plan-list');
+    l.innerHTML = '';
+    Object.entries(needs).forEach(([name, qty]) => {
+        l.innerHTML += `<div>${name}: <b>${qty}</b> times this week</div>`;
+    });
+}
+
+function calculateGroceries() {
+    // Calculate total cost using individual share prices
+    let total = 0;
+    const l = document.getElementById('grocery-plan-list');
+    const items = l.querySelectorAll('div');
+    items.forEach(div => {
+        const [name, rest] = div.innerText.split(':');
+        const qty = parseInt(rest.match(/\d+/));
+        const inv = Object.values(data.inventory).find(i => i.name === name.trim());
+        if (inv) {
+            // Use per-person share
+            total += (inv.totalPrice / inv.numPeople) * qty * data.groupSize;
+        }
+    });
+    document.getElementById('grocery-result').innerHTML = `<b>Total Money Needed: KSh ${Math.round(total)}</b>`;
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,7 +173,58 @@
                 <input id="join-code" placeholder="6-Digit Code">
                 <button onclick="joinGroup()" class="secondary">Join with Code</button>
             </div>
+            <div class="card">
+                <div class="card-title">Your Groups</div>
+                <div id="group-list"></div>
+            </div>
         </div>
+// --- Group Management UI Logic ---
+function renderGroupList() {
+    if (!user) return;
+    db.ref(`users/${user.uid}/groups`).once('value', snap => {
+        const groups = snap.val() || {};
+        const list = document.getElementById('group-list');
+        list.innerHTML = '';
+        Object.entries(groups).forEach(([code, g]) => {
+            const isActive = code === curCode;
+            list.innerHTML += `<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;'><span><b>${g.name}</b> <small style='color:#94a3b8'>[${code}]</small></span><span>${isActive ? '<span style=\'color:var(--cyan-accent);font-weight:700\'>(Active)</span>' : `<button style='background:var(--cyan-accent);color:#000;padding:4px 10px;border-radius:8px;font-size:13px;margin-right:6px' onclick='switchGroup("${code}")'>Switch</button>`}<button style='background:var(--danger);color:#fff;padding:4px 10px;border-radius:8px;font-size:13px' onclick='leaveGroup("${code}")'>Leave</button></span></div>`;
+        });
+        if (Object.keys(groups).length === 0) list.innerHTML = '<i>You are not in any groups.</i>';
+    });
+}
+
+function switchGroup(code) {
+    curCode = code;
+    syncGroup();
+    renderGroupList();
+    switchSection('dashboard');
+}
+
+function leaveGroup(code) {
+    if (!confirm('Leave this group?')) return;
+    db.ref(`users/${user.uid}/groups/${code}`).remove();
+    db.ref(`groups/${code}/members/${user.uid}`).remove();
+    if (curCode === code) {
+        // Switch to another group if available
+        db.ref(`users/${user.uid}/groups`).once('value', snap => {
+            const groups = snap.val() || {};
+            const next = Object.keys(groups)[0];
+            if (next) {
+                curCode = next;
+                syncGroup();
+            } else {
+                curCode = '';
+                switchSection('group');
+            }
+            renderGroupList();
+        });
+    } else {
+        renderGroupList();
+    }
+}
+
+// Render group list when opening group section
+document.querySelector(".nav-item[onclick*='group']").addEventListener('click', renderGroupList);
 
         <!-- Dashboard -->
         <div id="section-dashboard" class="section">
@@ -98,6 +235,10 @@
                 <div class="counter-btn" onclick="changeGS(1)">+</div>
             </div>
             <div id="daily-plan"></div>
+            <div style="margin-top:10px;display:flex;gap:20px;align-items:center;">
+                <span>Variety <span style="cursor:pointer;color:var(--cyan-accent);font-weight:bold;" title="Suggested because you haven't eaten this in 5 days">i</span></span>
+                <span>Affordability <span style="cursor:pointer;color:var(--cyan-accent);font-weight:bold;" title="Suggested because it's within your budget">i</span></span>
+            </div>
         </div>
 
         <!-- Inventory -->
@@ -155,7 +296,16 @@
             });
         }
 
-        function switchSection(id) { document.querySelectorAll('.section').forEach(s => s.style.display='none'); document.getElementById('section-'+id).style.display='block'; document.getElementById('drawer').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); }
+        function switchSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.style.display='none');
+            document.getElementById('section-'+id).style.display='block';
+            document.getElementById('drawer').classList.remove('active');
+            document.getElementById('overlay').classList.remove('active');
+            // Tutorial polish: if switching to inventory, wait for render before advancing
+            if (id === 'inventory' && window.tutorialStep === 1) {
+                setTimeout(() => { window.tutorialStep = 2; }, 300); // Wait for UI
+            }
+        }
         function createGroup() {
             const n = document.getElementById('new-group-name').value; if(!n) return;
             const c = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -167,7 +317,35 @@
             db.ref(`groups/${c}`).once('value', s => { if(s.exists()) { db.ref(`groups/${c}/members/${user.uid}`).set(true); db.ref(`users/${user.uid}/groups/${c}`).set({ name: s.val().name }).then(() => switchSection('dashboard')); } });
         }
         function changeGS(d) { db.ref(`groups/${curCode}/groupSize`).set(Math.max(1, data.groupSize + d)); }
-        function addInv() { const n = document.getElementById('inv-name').value, p = document.getElementById('inv-price').value, s = document.getElementById('inv-pax').value; if(n && p && s) db.ref(`groups/${curCode}/inventory`).push({ name: n, totalPrice: parseFloat(p), numPeople: parseInt(s) }); }
+        function addInv() {
+            const n = document.getElementById('inv-name').value,
+                p = document.getElementById('inv-price').value,
+                s = document.getElementById('inv-pax').value;
+            if (!(n && p && s)) return;
+            db.ref(`groups/${curCode}/inventory`).once('value', snap => {
+                let foundKey = null;
+                snap.forEach(child => {
+                    if (child.val().name && child.val().name.trim().toLowerCase() === n.trim().toLowerCase()) {
+                        foundKey = child.key;
+                    }
+                });
+                if (foundKey) {
+                    // Update existing item
+                    safeDbUpdate(`groups/${curCode}/inventory/${foundKey}`, {
+                        name: n,
+                        totalPrice: parseFloat(p),
+                        numPeople: parseInt(s)
+                    });
+                } else {
+                    // Add new item
+                    safeDbPush(`groups/${curCode}/inventory`, {
+                        name: n,
+                        totalPrice: parseFloat(p),
+                        numPeople: parseInt(s)
+                    });
+                }
+            });
+        }
         function addCombo() { const n = document.getElementById('co-name').value, t = document.getElementById('co-time').value; if(n && selectedIngs.size) db.ref(`groups/${curCode}/meals`).push({ name: n, baseNames: Array.from(selectedIngs), targetTime: t }); }
         function renderDash() {
             const cont = document.getElementById('daily-plan'); cont.innerHTML = "<h3>Daily Plan</h3>";
@@ -178,7 +356,19 @@
                 cont.innerHTML += `<div class="plan-slot"><div class="slot-time">${t}</div><b>${m ? m.name : 'No meal set'}</b><br><small>Total Cost: KSh ${Math.round(cost)}</small></div>`;
             });
         }
-        function renderInv() { const l = document.getElementById('inventory-list'); l.innerHTML = ""; Object.entries(data.inventory).forEach(([k,v]) => { l.innerHTML += `<div class="card"><b>${v.name}</b><br><small>KSh ${v.totalPrice} serves ${v.numPeople}</small></div>`; }); }
+        function renderInv() {
+            const l = document.getElementById('inventory-list');
+            l.innerHTML = "";
+            Object.entries(data.inventory).forEach(([k, v]) => {
+                l.innerHTML += `<div class="card"><b>${v.name}</b><br><small>KSh ${v.totalPrice} serves ${v.numPeople}</small><button style='margin-top:8px;background:var(--danger);color:#fff;font-size:13px;padding:6px 12px;border-radius:8px;width:auto' onclick='deleteInv("${k}")'>Delete</button></div>`;
+            });
+        }
+
+        function deleteInv(key) {
+            if (confirm("Delete this ingredient for everyone in the group?")) {
+                db.ref(`groups/${curCode}/inventory/${key}`).remove();
+            }
+        }
         function renderCombos() {
             const chips = document.getElementById('ingredient-chips'); chips.innerHTML = "";
             const unique = [...new Set(Object.values(data.inventory).map(x => x.name))];

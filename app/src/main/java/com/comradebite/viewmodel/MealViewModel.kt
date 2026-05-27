@@ -7,13 +7,17 @@ import androidx.lifecycle.viewModelScope
 import com.comradebite.data.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 import java.util.*
 import kotlin.random.Random
 
@@ -22,6 +26,9 @@ enum class SyncStatus {
 }
 
 data class GroupInfo(val code: String, val name: String)
+data class DailyHealth(val kcal: Int, val groups: List<String>)
+data class AiHint(val icon: String, val text: String)
+data class ChatMessage(val text: String, val isUser: Boolean)
 
 class MealViewModel(
     private val repository: MealRepository,
@@ -31,28 +38,33 @@ class MealViewModel(
     private val databaseUrl = "https://comradebite-c0265c98-default-rtdb.firebaseio.com"
     private val firebase = FirebaseDatabase.getInstance(databaseUrl)
     private val auth = FirebaseAuth.getInstance()
+    private val gson = Gson()
     
     private var mealsListener: ValueEventListener? = null
     private var inventoryListener: ValueEventListener? = null
     private var userGroupsListener: ValueEventListener? = null
     private var currentGroupNode: String? = null
 
+    private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        val user = firebaseAuth.currentUser
+        if (user != null) observeUserGroups(user.uid)
+        else _userGroups.value = emptyList()
+    }
+
     companion object {
         private const val TAG = "MealViewModel"
-        private const val TWO_WEEKS_DAYS = 14L
         private const val RESET_DELAY_MS = 60000L
-        private const val CHECK_AUTO_EAT_DELAY_MS = 30000L
         private const val MAX_GROUP_SIZE = 10
-        private const val SCORE_AFFORDABILITY_WEIGHT = 0.7
-        private const val SCORE_VARIETY_WEIGHT = 0.3
         
-        private const val PENALTY_UGALI_LUNCH = 3000.0
-        private const val BONUS_SPECIAL_MEAL = 8000.0 // Higher to guarantee special day slots
-        private const val PENALTY_NON_SPECIAL_DAY = 6000.0 // Heavy penalty to keep special meals for special days
-        private const val PENALTY_RARE_RECENT = 15000.0 // Extremely high to block more than once a week
-        private const val PENALTY_RARE_BASE = 1500.0
-        private const val PENALTY_VARIETY_STEP = 500.0
-        private const val RANDOM_OFFSET_MAX = 50.0
+        // --- SMART CALCULATOR WEIGHTS ---
+        private const val WEIGHT_VARIETY = 0.8
+        private const val WEIGHT_AFFORDABILITY = 0.2
+        
+        private const val PENALTY_RECENTLY_EATEN = 50000.0 
+        private const val PENALTY_REPEATED_IN_WEEK = 10000.0 
+        private const val PENALTY_OVER_BUDGET = 6000.0
+        private const val BONUS_SPECIAL = 15000.0
+        private const val LUCK_FACTOR_MAX = 500.0 
 
         val BREAKFAST_TIME = LocalTime.of(9, 0)
         val LUNCH_TIME = LocalTime.of(13, 0)
@@ -71,7 +83,7 @@ class MealViewModel(
     private val _userGroups = MutableStateFlow<List<GroupInfo>>(emptyList())
     val userGroups: StateFlow<List<GroupInfo>> = _userGroups
 
-    private val _groupSize = MutableStateFlow(1)
+    private val _groupSize = MutableStateFlow(prefs.getInt("group_size", 1))
     val groupSize: StateFlow<Int> = _groupSize
 
     private val _budgetPerPerson = MutableStateFlow<Double?>(null)
@@ -86,436 +98,403 @@ class MealViewModel(
     private val _isDarkTheme = MutableStateFlow(prefs.getBoolean("is_dark_theme", true))
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme
 
+    private val _waterToday = MutableStateFlow(prefs.getInt("water_today", 0))
+    val waterToday: StateFlow<Int> = _waterToday
+
+    private val _chatMessages = MutableStateFlow(listOf(ChatMessage("👋 Hey Comrade! I'm Chef AI. I've taken over the kitchen to help you eat well on any budget. Ask me anything!", false)))
+    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages
+
     private val dateSeparator = DateTimeFormatter.ofPattern("yyyyMMdd")
     private val _currentDay = MutableStateFlow(LocalDate.now().format(dateSeparator))
     val currentDay: StateFlow<String> = _currentDay
 
-    val currentBackground: Flow<Int> = flow {
-        while (true) {
-            val hour = LocalDateTime.now().hour
-            emit((hour / 2) % 3)
-            delay(RESET_DELAY_MS)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    private val _lockedWeeklyPlanIds = MutableStateFlow<List<Map<String, Int?>>>(loadLockedPlan())
 
     val allBaseMeals = repository.allBaseMeals
     val allCombinations = repository.allCombinations
 
+    val currentBackground: Flow<Int> = flow {
+        while (true) {
+            emit((LocalDateTime.now().hour / 2) % 3)
+            delay(RESET_DELAY_MS)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     val dailyPlan: StateFlow<Map<String, MealCombination?>> = combine(
         allCombinations,
-        allBaseMeals,
-        _eatenTodayIngredients,
-        _eatenTodayComboIds,
+        _lockedWeeklyPlanIds,
         _currentDay
-    ) { combos, baseMeals, eaten, eatenIds, _ ->
-        val isTodaySpecial = LocalDate.now().dayOfWeek.value.let { it == 3 || it == 5 || it == 7 }
-        calculatePlanForDay(
-            combos = combos,
-            baseMeals = baseMeals,
-            size = _groupSize.value,
-            eaten = eaten,
-            eatenIds = eatenIds,
-            forceSpecial = isTodaySpecial,
-            planned = emptyMap(),
-            random = false
-        )
+    ) { combos, lockedIds, _ ->
+        val now = LocalDate.now()
+        val dayIndex = now.dayOfWeek.value % 7 // Sunday = 0
+        if (lockedIds.size > dayIndex) dayPlanFromIds(lockedIds[dayIndex], combos) else emptyMap()
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     val weeklyTimetable: StateFlow<List<Map<String, MealCombination?>>> = combine(
         allCombinations,
-        allBaseMeals,
-        _groupSize
-    ) { combos, baseMeals, size ->
-        if (combos.isEmpty()) return@combine emptyList()
-
-        val cal = Calendar.getInstance()
-        val seed = cal.get(Calendar.YEAR) * 100L + cal.get(Calendar.WEEK_OF_YEAR)
-        val weekRandom = Random(seed)
-
-        val weekly = mutableListOf<Map<String, MealCombination?>>()
-        val rareIdsUsedThisWeek = mutableSetOf<Int>()
-        val allIdsUsedThisWeek = mutableMapOf<Int, Int>()
-        val weeklyIngredientHistory = mutableSetOf<String>()
-        
-        repeat(7) { i ->
-            val dayNumber = i + 1
-            val isDaySpecial = dayNumber == 3 || dayNumber == 5 || dayNumber == 7
-            
-            val dayPlan = calculatePlanForDay(
-                combos = combos,
-                baseMeals = baseMeals,
-                size = size,
-                eaten = emptySet(),
-                eatenIds = emptySet(),
-                forceSpecial = isDaySpecial,
-                planned = allIdsUsedThisWeek,
-                random = true,
-                randomSource = weekRandom,
-                rareIdsThisWeek = rareIdsUsedThisWeek,
-                weeklyIngredientHistory = weeklyIngredientHistory
-            )
-            
-            weekly.add(dayPlan)
-            dayPlan.values.filterNotNull().forEach { combo ->
-                allIdsUsedThisWeek[combo.id] = allIdsUsedThisWeek.getOrDefault(combo.id, 0) + 1
-                if (combo.isRare) rareIdsUsedThisWeek.add(combo.id)
-                combo.baseNames.forEach { weeklyIngredientHistory.add(it.trim().lowercase()) }
-            }
-            if ((i + 1) % 2 == 0) weeklyIngredientHistory.clear()
-        }
-        weekly
+        _lockedWeeklyPlanIds
+    ) { combos, lockedIds ->
+        lockedIds.map { dayMap -> dayPlanFromIds(dayMap, combos) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val dailyHealth: StateFlow<DailyHealth> = dailyPlan.map { plan: Map<String, MealCombination?> ->
+        var kcal = 0
+        val groups = mutableSetOf<String>()
+        plan.values.filterNotNull().forEach { combo ->
+            combo.baseNames.forEach { name ->
+                FoodDatabase.getFoodData(name)?.let {
+                    kcal += it.kcal
+                    groups.add(it.group)
+                }
+            }
+        }
+        DailyHealth(kcal, groups.toList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DailyHealth(0, emptyList()))
+
+    val aiThoughts: StateFlow<List<String>> = combine(dailyHealth, _waterToday, _budgetPerPerson) { health, water, budget ->
+        val groups = health.groups
+        val kcal = health.kcal
+        
+        val thoughts = mutableListOf<String>()
+        
+        // Humanized Chef AI thoughts - human-like, conversational, student-friendly
+        thoughts.add("Welcome to today's meals, eat with a smile!")
+        thoughts.add("Good food, good mood, good grades. You've got this!")
+        
+        if (water < 4) {
+            thoughts.add("You're looking a bit dry, Comrade. Grab a glass of water, your brain will thank you!")
+        } else if (water >= 8) {
+            thoughts.add("Absolute hydration legend! You're basically made of logic and fresh water today! 🎉")
+        }
+
+        if (!groups.any { it == "fruit" || it == "vegetable" }) {
+            thoughts.add("A fruit today won't cost much, but man, it'll make you feel like a new person!")
+        }
+
+        if (kcal > 0 && kcal < 1300) {
+            thoughts.add("Don't let your battery hit zero! Your brain needs energy as much as your books.")
+        } else if (kcal > 2200) {
+            thoughts.add("That's some solid fuel right there! You're definitely ready for whatever the day throws at you.")
+        }
+
+        if (budget != null && budget < 120) {
+            thoughts.add("Managing that budget like a pro. Saving is an art, and you're the artist.")
+        }
+
+        if (groups.size >= 4) {
+            thoughts.add("Your plate looks like a rainbow of health! Excellence is definitely a habit for you.")
+        }
+
+        thoughts.add("A hungry comrade is a weary comrade. Let's fuel up!")
+        thoughts.add("Success starts with a full stomach. Bon appétit!")
+        
+        thoughts.shuffle()
+        thoughts
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("Welcome to today's meals, eat with a smile!"))
+
+    val aiHint: StateFlow<AiHint?> = combine(dailyHealth, _waterToday) { health: DailyHealth, water: Int ->
+        val groups = health.groups
+        val kcal = health.kcal
+        val hour = LocalDateTime.now().hour
+
+        when {
+            groups.isEmpty() -> null
+            !groups.any { it == "vegetable" || it == "fruit" || it == "mixed" } -> 
+                AiHint("🍎", "Missing some greens today? A small fruit goes a long way in keeping you fresh!")
+            !groups.any { it == "protein" || it == "mixed" } -> 
+                AiHint("💪", "Chef AI says: A little protein keeps you full longer. Maybe add an egg or some beans?")
+            kcal > 0 && kcal < 1400 -> 
+                AiHint("🔥", "Energy check! You're a bit low today. Treat yourself to a heartier dinner, you deserve it!")
+            water < 4 && hour > 12 -> 
+                AiHint("💧", "Hydration break! Grab a glass of water, Comrade. Your focus depends on it.")
+            else -> null
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
         viewModelScope.launch {
             while (true) {
-                val today = LocalDate.now().format(dateSeparator)
-                val lastReset = prefs.getString("last_reset_day", "")
-                if (today != lastReset) {
+                val now = LocalDate.now()
+                val today = now.format(dateSeparator)
+                if (today != prefs.getString("last_reset_day", "")) {
                     resetDay()
                     _currentDay.value = today
                     prefs.edit().putString("last_reset_day", today).apply()
                 }
+
+                val sunday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
+                val currentWeekKey = sunday.format(DateTimeFormatter.ofPattern("yyyy_MM_dd"))
+                
+                if (currentWeekKey != prefs.getString("last_generated_week", "") || _lockedWeeklyPlanIds.value.isEmpty()) {
+                    generateAndLockWeeklyPlan()
+                    prefs.edit().putString("last_generated_week", currentWeekKey).apply()
+                }
+
                 delay(RESET_DELAY_MS)
             }
         }
+        auth.addAuthStateListener(authStateListener)
+        if (_groupCode.value.isNotBlank()) setupFirebaseSync(_groupCode.value)
+    }
 
+    private fun generateAndLockWeeklyPlan() {
         viewModelScope.launch {
-            while (true) {
-                val now = LocalTime.now()
-                val currentPlan = dailyPlan.value
-                if (now.isAfter(BREAKFAST_TIME) && now.isBefore(LUNCH_TIME)) {
-                    if (!_eatenTodayComboIds.value.any { id -> currentPlan["Breakfast"]?.id == id }) {
-                        currentPlan["Breakfast"]?.let { markAsEaten(it) }
-                    }
-                }
-                if (now.isAfter(LUNCH_TIME) && now.isBefore(DINNER_TIME)) {
-                    if (!_eatenTodayComboIds.value.any { id -> currentPlan["Lunch"]?.id == id }) {
-                        currentPlan["Lunch"]?.let { markAsEaten(it) }
-                    }
-                }
-                if (now.isAfter(DINNER_TIME)) {
-                    if (!_eatenTodayComboIds.value.any { id -> currentPlan["Dinner"]?.id == id }) {
-                        currentPlan["Dinner"]?.let { markAsEaten(it) }
-                    }
-                }
-                delay(CHECK_AUTO_EAT_DELAY_MS)
+            val combos = allCombinations.first()
+            val baseMeals = allBaseMeals.first()
+            if (combos.isEmpty()) return@launch
+
+            val now = LocalDate.now()
+            val sunday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
+            val seed = sunday.year * 10000L + sunday.monthValue * 100L + sunday.dayOfMonth
+            val weekRandom = Random(seed)
+
+            val lockedPlan = mutableListOf<Map<String, Int?>>()
+            val weekHistory = mutableMapOf<Int, Int>() 
+
+            repeat(7) { i ->
+                val isSpecial = (i == 0 || i == 3 || i == 5 || i == 6) // Sun, Wed, Fri, Sat
+                val dayPlan = calculatePlanForDay(combos, baseMeals, _groupSize.value, isSpecial, weekRandom, weekHistory)
+                lockedPlan.add(dayPlan.mapValues { it.value?.id })
+                dayPlan.values.filterNotNull().forEach { weekHistory[it.id] = (weekHistory[it.id] ?: 0) + 1 }
             }
-        }
-
-        auth.addAuthStateListener { firebaseAuth ->
-            val user = firebaseAuth.currentUser
-            if (user != null) observeUserGroups(user.uid)
-            else _userGroups.value = emptyList()
-        }
-
-        if (_groupCode.value.isNotBlank()) setupFirebaseSync(_groupCode.value)
-    }
-
-    private fun observeUserGroups(uid: String) {
-        userGroupsListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val groups = mutableListOf<GroupInfo>()
-                snapshot.children.forEach { child ->
-                    val code = child.key ?: return@forEach
-                    val name = child.child("name").getValue(String::class.java) ?: "Unknown"
-                    groups.add(GroupInfo(code, name))
-                }
-                _userGroups.value = groups
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        firebase.getReference("users").child(uid).child("groups").addValueEventListener(userGroupsListener!!)
-    }
-
-    fun manualSync() {
-        if (_groupCode.value.isNotBlank()) setupFirebaseSync(_groupCode.value)
-    }
-
-    fun updateGroupCode(code: String) {
-        val cleanCode = code.trim().uppercase()
-        currentGroupNode?.let { old ->
-            mealsListener?.let { firebase.getReference("groups").child(old).child("meals").removeEventListener(it) }
-            inventoryListener?.let { firebase.getReference("groups").child(old).child("inventory").removeEventListener(it) }
-        }
-        _groupCode.value = cleanCode
-        prefs.edit().putString("group_code", cleanCode).apply()
-        if (cleanCode.isNotBlank()) setupFirebaseSync(cleanCode)
-        else {
-            _syncStatus.value = SyncStatus.IDLE
-            _groupName.value = ""
-            currentGroupNode = null
+            saveLockedPlan(lockedPlan)
+            _lockedWeeklyPlanIds.value = lockedPlan
         }
     }
 
-    fun joinGroup(code: String, onResult: (Boolean, String) -> Unit) {
-        val cleanCode = code.trim().uppercase()
-        val user = auth.currentUser ?: return onResult(false, "Please login first")
-        _syncStatus.value = SyncStatus.SYNCING
-        firebase.getReference("groups").child(cleanCode).child("name").addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val name = snapshot.getValue(String::class.java)
-                if (name != null) {
-                    val updates = mapOf(
-                        "users/${user.uid}/groups/$cleanCode/name" to name,
-                        "groups/$cleanCode/members/${user.uid}" to true
-                    )
-                    firebase.reference.updateChildren(updates).addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            updateGroupCode(cleanCode)
-                            onResult(true, "Joined $name!")
-                        } else onResult(false, "Join failed")
-                    }
-                } else onResult(false, "Invalid Code")
+    private fun calculatePlanForDay(
+        combos: List<MealCombination>, 
+        bm: List<BaseMeal>, 
+        size: Int, 
+        forceSpecial: Boolean, 
+        rand: Random,
+        weekHistory: Map<Int, Int>
+    ): Map<String, MealCombination?> {
+        val plan = mutableMapOf<String, MealCombination?>()
+        val usedIngsToday = mutableSetOf<String>()
+        
+        listOf("Breakfast", "Lunch", "Dinner").forEach { time ->
+            val candidates = combos.filter { it.targetTime == time && !it.baseNames.any { b -> usedIngsToday.contains(b.lowercase().trim()) } }
+            val pick = candidates.maxByOrNull { combo ->
+                var score = calculateScore(combo, bm, size, forceSpecial)
+                score -= (weekHistory[combo.id] ?: 0) * PENALTY_REPEATED_IN_WEEK
+                score + rand.nextDouble(0.0, LUCK_FACTOR_MAX) 
             }
-            override fun onCancelled(error: DatabaseError) = onResult(false, error.message)
-        })
+            plan[time] = pick
+            pick?.baseNames?.forEach { usedIngsToday.add(it.lowercase().trim()) }
+        }
+        return plan
     }
 
-    fun createGroup(name: String) {
-        val user = auth.currentUser ?: return
-        val code = generateRandomCode(6)
-        val updates = mutableMapOf<String, Any>()
-        updates["groups/$code/name"] = name
-        updates["groups/$code/owner"] = user.uid
-        updates["groups/$code/members/${user.uid}"] = true
-        updates["users/${user.uid}/groups/$code/name"] = name
-        firebase.reference.updateChildren(updates).addOnCompleteListener { if (it.isSuccessful) updateGroupCode(code) }
+    private fun calculateScore(c: MealCombination, bm: List<BaseMeal>, size: Int, isSpecialDay: Boolean): Double {
+        val shareResult = getDetailedShare(c, bm, size)
+        val share = shareResult.totalPrice
+        val budget = _budgetPerPerson.value
+        
+        var score = 10000.0 // Baseline
+        
+        // 1. Variety Logic (Most Critical)
+        val now = System.currentTimeMillis()
+        val hoursSinceEaten = if (c.lastEaten == 0L) 1000L else (now - c.lastEaten) / (1000 * 60 * 60)
+        
+        if (hoursSinceEaten < 48) {
+            score -= PENALTY_RECENTLY_EATEN
+        } else {
+            // Reward variety: linear boost for time since last eaten
+            score += (hoursSinceEaten.toDouble().coerceAtMost(500.0) * 20) * WEIGHT_VARIETY 
+        }
+
+        // 2. Affordability logic
+        val costFactor = if (share <= 0) 45.0 else share
+        score += (4000.0 / (costFactor + 1.0)) * WEIGHT_AFFORDABILITY
+        
+        // 3. Elastic Budget penalty
+        if (budget != null && share > budget) {
+            val overage = share - budget
+            score -= (PENALTY_OVER_BUDGET + (overage * 20))
+        }
+
+        // 4. Special Logic
+        if (isSpecialDay) {
+            if (c.isSpecial) score += BONUS_SPECIAL
+        } else {
+            if (c.isSpecial) score -= (BONUS_SPECIAL * 1.5)
+        }
+        
+        if (c.targetTime == "Lunch" && c.name.contains("Ugali", true)) score -= 5000.0
+        
+        return score
     }
 
-    private fun generateRandomCode(length: Int) = (1..length).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }.joinToString("")
+    data class ShareResult(val totalPrice: Double, val hasMissing: Boolean)
 
-    private fun setupFirebaseSync(code: String) {
-        _syncStatus.value = SyncStatus.SYNCING
-        currentGroupNode = code
-        firebase.getReference("groups").child(code).child("name").addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(s: DataSnapshot) {
-                val n = s.getValue(String::class.java) ?: "Group"
-                _groupName.value = n
-                prefs.edit().putString("group_name", n).apply()
-            }
-            override fun onCancelled(e: DatabaseError) {}
-        })
-
-        var mLoaded = false
-        var iLoaded = false
-        mealsListener = object : ValueEventListener {
-            override fun onDataChange(s: DataSnapshot) {
-                mLoaded = true
-                if (iLoaded) _syncStatus.value = SyncStatus.SYNCED
-                viewModelScope.launch {
-                    val local = allCombinations.first()
-                    val toIns = mutableListOf<MealCombination>()
-                    s.children.forEach { c ->
-                        val map = c.value as? Map<*, *> ?: return@forEach
-                        val name = map["name"] as? String ?: ""
-                        val ings = map["baseNames"] as? List<String> ?: emptyList()
-                        if (local.none { it.name == name && it.baseNames == ings }) {
-                            toIns.add(MealCombination(name = name, baseNames = ings, targetTime = map["targetTime"] as? String ?: "Breakfast"))
-                        }
-                    }
-                    if (toIns.isNotEmpty()) repository.insertCombinations(toIns)
-                }
-            }
-            override fun onCancelled(e: DatabaseError) { _syncStatus.value = SyncStatus.ERROR }
+    private fun getDetailedShare(c: MealCombination, bm: List<BaseMeal>, s: Int): ShareResult {
+        var total = 0.0
+        var missing = false
+        c.baseNames.forEach { name ->
+            val match = bm.find { it.name.trim().equals(name.trim(), true) && it.numPeople == s } 
+                ?: bm.find { it.name.trim().equals(name.trim(), true) }
+            if (match != null) total += match.pricePerPerson else missing = true
         }
-        firebase.getReference("groups").child(code).child("meals").addValueEventListener(mealsListener!!)
+        return ShareResult(total, missing)
+    }
 
-        inventoryListener = object : ValueEventListener {
-            override fun onDataChange(s: DataSnapshot) {
-                iLoaded = true
-                if (mLoaded) _syncStatus.value = SyncStatus.SYNCED
-                viewModelScope.launch {
-                    val local = allBaseMeals.first()
-                    val toIns = mutableListOf<BaseMeal>()
-                    s.children.forEach { c ->
-                        val map = c.value as? Map<*, *> ?: return@forEach
-                        val name = map["name"] as? String ?: ""
-                        val price = (map["totalPrice"] as? Number)?.toDouble() ?: 0.0
-                        val ppl = (map["numPeople"] as? Number)?.toInt() ?: 1
-                        if (local.none { it.name == name && it.numPeople == ppl }) {
-                            toIns.add(BaseMeal(name = name, totalPrice = price, numPeople = ppl))
-                        }
-                    }
-                    if (toIns.isNotEmpty()) repository.insertBaseMeals(toIns)
-                }
-            }
-            override fun onCancelled(e: DatabaseError) { _syncStatus.value = SyncStatus.ERROR }
+    fun getIndividualShare(c: MealCombination, bm: List<BaseMeal>, s: Int): Double? {
+        val res = getDetailedShare(c, bm, s)
+        return if (res.totalPrice == 0.0 && res.hasMissing) null else res.totalPrice
+    }
+
+    private fun saveLockedPlan(plan: List<Map<String, Int?>>) = prefs.edit().putString("locked_weekly_plan", gson.toJson(plan)).apply()
+    private fun loadLockedPlan(): List<Map<String, Int?>> {
+        val json = prefs.getString("locked_weekly_plan", null) ?: return emptyList()
+        return gson.fromJson(json, object : TypeToken<List<Map<String, Int?>>>() {}.type)
+    }
+    private fun dayPlanFromIds(map: Map<String, Int?>, combos: List<MealCombination>) = map.mapValues { entry -> combos.find { combo -> combo.id == entry.value } }
+
+    fun setGroupSize(s: Int) { 
+        _groupSize.value = s.coerceIn(1, 10)
+        prefs.edit().putInt("group_size", _groupSize.value).apply()
+        generateAndLockWeeklyPlan() 
+    }
+
+    fun setBudget(b: Double?) { _budgetPerPerson.value = b }
+    fun toggleTheme() { _isDarkTheme.value = !_isDarkTheme.value; prefs.edit().putBoolean("is_dark_theme", _isDarkTheme.value).apply() }
+    
+    fun logWater() {
+        _waterToday.value = (_waterToday.value + 1).coerceAtMost(12)
+        prefs.edit().putInt("water_today", _waterToday.value).apply()
+    }
+
+    fun sendChatMessage(query: String) {
+        val userMsg = ChatMessage(query, true)
+        _chatMessages.value = _chatMessages.value + userMsg
+        
+        viewModelScope.launch {
+            delay(400)
+            val response = aiRespond(query)
+            _chatMessages.value = _chatMessages.value + ChatMessage(response, false)
         }
-        firebase.getReference("groups").child(code).child("inventory").addValueEventListener(inventoryListener!!)
+    }
+
+    private fun aiRespond(query: String): String {
+        val q = query.lowercase().trim()
+        val health = dailyHealth.value
+        val kcal = health.kcal
+        val groups = health.groups
+        val water = _waterToday.value
+        
+        // Humanized Chef AI responses
+        FoodDatabase.DATA.keys.forEach { kw ->
+            if (q.contains(kw) && (q.contains("calorie") || q.contains("kcal") || q.contains("how many") || q.contains("much"))) {
+                val d = FoodDatabase.DATA[kw]!!
+                return "${d.emoji} <b>${kw.replaceFirstChar { it.uppercase() }}</b> — it's about ${d.kcal} kcal. It's a <b>${d.label}</b> food. ${
+                    when(d.group) {
+                        "protein" -> "Perfect for keeping you strong and focused!"
+                        "vegetable", "fruit" -> "Great choice! Your body loves those vitamins."
+                        "carb" -> "That'll give you plenty of energy to push through."
+                        else -> "Enjoy your meal!"
+                    }
+                }"
+            }
+        }
+
+        if (q.contains("balance") || q.contains("balanced")) {
+            val hitCount = listOf("carb", "protein", "vegetable", "fruit").count { t -> groups.any { it == t || it == "mixed" } }
+            val bal = (hitCount.toFloat() / 4f * 100).toInt()
+            return "Looking at your plate, it's about $bal% balanced. ${if(bal >= 75) "You're doing great!" else "Maybe throw in some " + (if(!groups.contains("protein")) "beans or eggs " else "") + (if(!groups.any { it == "fruit" || it == "vegetable" }) "fruits or veggies" else "") + " next time?"}"
+        }
+
+        if (q.contains("calorie") || q.contains("kcal")) {
+            return "You've got about ~$kcal kcal in your plan for today. ${if(kcal < 1400) "A bit light, don't you think? You might need a snack later." else if(kcal > 2400) "That's a solid amount of energy! You're ready for anything." else "Looks like a good balance!"}"
+        }
+
+        if (q.contains("water") || q.contains("drink") || q.contains("hydrat")) {
+            return "You've had $water glasses today. ${if(water >= 8) "You're a hydration hero! 🎉" else "Keep sipping! Your brain will thank you for it."}"
+        }
+
+        if (q.contains("protein")) return "💪 For protein on a budget, go for beans, eggs, lentils, or groundnuts. They are absolute lifesavers!"
+        if (q.contains("fruit") || q.contains("vitamin")) return "🍎 Bananas, mangoes, and oranges are easy wins. Even an avocado is great for those healthy fats!"
+        if (q.contains("vegetable") || q.contains("veggie") || q.contains("green")) return "🥬 Sukuma wiki, spinach, and cabbage are the real MVPs. Cheap and super healthy!"
+        if (q.contains("cheap") || q.contains("budget") || q.contains("afford")) return "💰 Eggs, beans, ugali, and sukuma wiki. This is the ultimate comrade power combo!"
+
+        return "🤖 I'm Chef AI! Ask me about calories, if your plan looks good, or some budget tips. I'm here to help you eat like a king on a student budget!"
+    }
+
+    fun insertBaseMeal(name: String, price: Double, serves: Int, id: Int = 0) = viewModelScope.launch { repository.insertBaseMeal(BaseMeal(id, name, price, serves)) }
+    fun deleteBaseMeal(meal: BaseMeal) = viewModelScope.launch { repository.deleteBaseMeal(meal) }
+    
+    fun saveCombination(name: String, baseNames: List<String>, targetTime: String, isSpecial: Boolean, isRare: Boolean) = viewModelScope.launch {
+        repository.insertCombination(MealCombination(name = name, baseNames = baseNames, targetTime = targetTime, isSpecial = isSpecial, isRare = isRare))
+    }
+    fun deleteCombination(combo: MealCombination) = viewModelScope.launch { repository.deleteCombination(combo) }
+
+    fun markAsEaten(c: MealCombination) = viewModelScope.launch { repository.updateCombination(c.copy(frequency = c.frequency + 1, lastEaten = System.currentTimeMillis())) }
+    fun resetDay() { 
+        _eatenTodayIngredients.value = emptySet()
+        _eatenTodayComboIds.value = emptySet()
+        _waterToday.value = 0
+        prefs.edit().putInt("water_today", 0).apply()
+    }
+    fun updateGroupCode(code: String) { _groupCode.value = code.uppercase(); prefs.edit().putString("group_code", code).apply(); if (code.isNotBlank()) setupFirebaseSync(code) }
+
+    fun joinGroup(code: String, onResult: (Boolean, String) -> Unit) { 
+        // Sync implementation would go here
+    }
+
+    fun uploadInventoryListToFirebase(meals: List<BaseMeal>) {
+        val code = _groupCode.value
+        if (code.isBlank()) return
+        val ref = firebase.getReference("groups").child(code).child("inventory")
+        meals.forEach { meal -> ref.child(meal.id.toString()).setValue(meal) }
     }
 
     fun uploadComboToFirebase(combo: MealCombination) {
         val code = _groupCode.value
         if (code.isBlank()) return
-        val ref = firebase.getReference("groups").child(code).child("meals")
-        ref.child(ref.push().key ?: return).setValue(combo)
+        firebase.getReference("groups").child(code).child("meals").child(combo.id.toString()).setValue(combo)
     }
 
-    fun uploadInventoryListToFirebase(meals: List<BaseMeal>) {
-        val code = _groupCode.value
-        if (code.isBlank() || meals.isEmpty()) return
-        val ref = firebase.getReference("groups").child(code).child("inventory")
-        val updates = mutableMapOf<String, Any>()
-        meals.forEach { updates[ref.push().key ?: return@forEach] = it }
-        ref.updateChildren(updates).addOnFailureListener { _syncStatus.value = SyncStatus.ERROR }
-    }
-
-    fun saveCombination(name: String, ingredients: List<String>, time: String, isSpecial: Boolean, isRare: Boolean) {
-        viewModelScope.launch {
-            repository.insertCombination(
-                MealCombination(
-                    name = name,
-                    baseNames = ingredients,
-                    targetTime = time,
-                    isSpecial = isSpecial,
-                    isRare = isRare
-                )
-            )
-        }
-    }
-
-    fun deleteCombination(combo: MealCombination) {
-        viewModelScope.launch {
-            repository.deleteCombination(combo)
-        }
-    }
-
-    fun insertBaseMeal(name: String, price: Double, serves: Int, id: Int = 0) {
-        viewModelScope.launch {
-            repository.insertBaseMeal(BaseMeal(id = id, name = name, totalPrice = price, numPeople = serves))
-        }
-    }
-
-    fun deleteBaseMeal(meal: BaseMeal) {
-        viewModelScope.launch {
-            repository.deleteBaseMeal(meal)
-        }
-    }
-
-    fun setGroupSize(s: Int) { _groupSize.value = s.coerceIn(1, MAX_GROUP_SIZE) }
-    fun setBudget(b: Double?) { _budgetPerPerson.value = b }
-    fun toggleTheme() {
-        val n = !_isDarkTheme.value
-        _isDarkTheme.value = n
-        prefs.edit().putBoolean("is_dark_theme", n).apply()
-    }
-
-    private fun calculatePlanForDay(
-        combos: List<MealCombination>,
-        baseMeals: List<BaseMeal>,
-        size: Int,
-        eaten: Set<String>,
-        eatenIds: Set<Int>,
-        forceSpecial: Boolean,
-        planned: Map<Int, Int>,
-        random: Boolean,
-        randomSource: Random? = null,
-        rareIdsThisWeek: Set<Int> = emptySet(),
-        weeklyIngredientHistory: Set<String> = emptySet()
-    ): Map<String, MealCombination?> {
-        val plan = mutableMapOf<String, MealCombination?>()
-        val ingsUsedToday = eaten.map { it.trim().lowercase() }.toMutableSet()
-        val idsUsedToday = eatenIds.toMutableSet()
-
-        listOf("Breakfast", "Lunch", "Dinner").forEach { time ->
-            val cand = combos.filter { combo ->
-                combo.targetTime == time && 
-                combo.id !in idsUsedToday &&
-                combo.id !in rareIdsThisWeek
-            }
-
-            val filteredByIng = cand.filter { !isAnyIngredientUsed(it, ingsUsedToday) }
-            val finalCandidates = if (filteredByIng.isNotEmpty()) filteredByIng else cand
-
-            val pick = finalCandidates.maxByOrNull { combo ->
-                var score = calculateScore(combo, baseMeals, size, forceSpecial)
-                
-                val timesUsedInPlan = planned[combo.id] ?: 0
-                if (timesUsedInPlan > 0) {
-                    val repeatPenalty = if (forceSpecial && combo.isSpecial) 1000.0 else 10000.0
-                    score -= repeatPenalty * timesUsedInPlan
+    private fun setupFirebaseSync(code: String) {
+        _syncStatus.value = SyncStatus.SYNCING
+        currentGroupNode = code
+        mealsListener = firebase.getReference("groups").child(code).child("meals").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                viewModelScope.launch {
+                    val local = allCombinations.first()
+                    s.children.forEach { c ->
+                        val map = c.value as? Map<*, *> ?: return@forEach
+                        val name = map["name"] as? String ?: ""
+                        val ings = (map["baseNames"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                        if (local.none { it.name.equals(name, true) && it.baseNames == ings }) {
+                            repository.insertCombination(MealCombination(name = name, baseNames = ings, targetTime = map["targetTime"] as? String ?: "Breakfast"))
+                        }
+                    }
+                    _syncStatus.value = SyncStatus.SYNCED
                 }
-                
-                if (isAnyIngredientUsed(combo, weeklyIngredientHistory)) {
-                    score -= 1500.0
-                }
-
-                if (random) {
-                    score += (randomSource ?: Random).nextDouble(0.0, RANDOM_OFFSET_MAX)
-                }
-                score
             }
-            
-            plan[time] = pick
-            pick?.let {
-                idsUsedToday.add(it.id)
-                it.baseNames.forEach { n -> ingsUsedToday.add(n.trim().lowercase()) }
+            override fun onCancelled(e: DatabaseError) { _syncStatus.value = SyncStatus.ERROR }
+        })
+    }
+
+    private fun observeUserGroups(uid: String) {
+        userGroupsListener = firebase.getReference("users").child(uid).child("groups").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                _userGroups.value = s.children.map { GroupInfo(it.key ?: "", it.child("name").getValue(String::class.java) ?: "Unknown") }
             }
-        }
-        return plan
+            override fun onCancelled(e: DatabaseError) {}
+        })
     }
 
-    private fun isAnyIngredientUsed(c: MealCombination, used: Set<String>): Boolean {
-        return c.baseNames.any { it.trim().lowercase() in used }
-    }
-
-    private fun calculateScore(c: MealCombination, bm: List<BaseMeal>, s: Int, isSpecialDay: Boolean): Double {
-        val share = getIndividualShare(c, bm, s) ?: return -20000.0
-        
-        val budget = _budgetPerPerson.value
-        if (budget != null && share > budget) return -30000.0
-
-        var score = (2000.0 / (share + 1.0)) * SCORE_AFFORDABILITY_WEIGHT
-        score += (10.0 / (c.frequency + 1.0)) * SCORE_VARIETY_WEIGHT
-        
-        val daysSinceLastEaten = if (c.lastEaten == 0L) 30L else (System.currentTimeMillis() - c.lastEaten) / (24 * 60 * 60 * 1000)
-        if (daysSinceLastEaten < 3) {
-            score -= (3 - daysSinceLastEaten) * PENALTY_VARIETY_STEP
+    override fun onCleared() {
+        super.onCleared()
+        auth.removeAuthStateListener(authStateListener)
+        currentGroupNode?.let { code ->
+            mealsListener?.let { firebase.getReference("groups").child(code).child("meals").removeEventListener(it) }
+            inventoryListener?.let { firebase.getReference("groups").child(code).child("inventory").removeEventListener(it) }
         }
-        
-        if (c.targetTime == "Lunch" && c.name.contains("Ugali", true)) score -= PENALTY_UGALI_LUNCH
-        
-        if (isSpecialDay) {
-            if (c.isSpecial) {
-                score += BONUS_SPECIAL_MEAL
-            } else if (c.targetTime != "Breakfast") {
-                score -= PENALTY_NON_SPECIAL_DAY
-            }
-        } else {
-            // Reserve special meals for special days
-            if (c.isSpecial) {
-                score -= PENALTY_NON_SPECIAL_DAY
-            }
+        val user = auth.currentUser
+        if (user != null && userGroupsListener != null) {
+            firebase.getReference("users").child(user.uid).child("groups").removeEventListener(userGroupsListener!!)
         }
-
-        if (c.isRare) {
-            // Rule: Rare meals strictly once per week logic is handled in the filter, 
-            // but we also penalize recent history here.
-            if (daysSinceLastEaten < TWO_WEEKS_DAYS) score -= PENALTY_RARE_RECENT
-            else score -= PENALTY_RARE_BASE
-        }
-        
-        return score
-    }
-
-    fun getIndividualShare(c: MealCombination, bm: List<BaseMeal>, s: Int): Double? {
-        var total = 0.0
-        for (n in c.baseNames) {
-            val m = bm.find { it.name.trim().equals(n.trim(), true) && it.numPeople == s } ?: bm.find { it.name.trim().equals(n.trim(), true) } ?: return null
-            total += m.pricePerPerson
-        }
-        return total
-    }
-
-    fun markAsEaten(c: MealCombination) = viewModelScope.launch {
-        repository.updateCombination(c.copy(frequency = c.frequency + 1, lastEaten = System.currentTimeMillis()))
-        _eatenTodayIngredients.value = _eatenTodayIngredients.value + c.baseNames.map { it.trim().lowercase() }
-        _eatenTodayComboIds.value = _eatenTodayComboIds.value + c.id
-    }
-
-    fun resetDay() {
-        _eatenTodayIngredients.value = emptySet()
-        _eatenTodayComboIds.value = emptySet()
     }
 }

@@ -10,6 +10,19 @@ local.properties
 .idea/
 *.iml
 .DS_Store
+.kotlin/
+*.swp
 
 # Firebase
 .firebase/
+# firebaserc and firebase.json are usually committed, but let's keep them unless requested otherwise
+
+# Android Studio / Android
+captures/
+*.apk
+*.aar
+*.jks
+*.keystore
+
+# External dependencies
+node_modules/

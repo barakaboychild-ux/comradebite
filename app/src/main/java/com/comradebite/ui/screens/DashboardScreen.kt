@@ -1,13 +1,14 @@
 package com.comradebite.ui.screens
 
-import android.widget.Toast
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -18,25 +19,28 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.comradebite.data.MealCombination
+import com.comradebite.data.BaseMeal
 import com.comradebite.ui.theme.CyanAccent
-import com.comradebite.viewmodel.MealViewModel
+import com.comradebite.viewmodel.*
 import kotlinx.coroutines.delay
-import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.core.text.HtmlCompat
+import coil.compose.AsyncImage
 
 @Composable
-fun DashboardScreen(viewModel: MealViewModel) {
+fun DashboardScreen(viewModel: MealViewModel, backgroundRes: Int) {
     val groupSize by viewModel.groupSize.collectAsState()
     val groupCode by viewModel.groupCode.collectAsState()
     val groupName by viewModel.groupName.collectAsState()
@@ -44,213 +48,271 @@ fun DashboardScreen(viewModel: MealViewModel) {
     val allBaseMeals by viewModel.allBaseMeals.collectAsState(initial = emptyList())
     val allCombinations by viewModel.allCombinations.collectAsState(initial = emptyList())
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+    val dailyHealth by viewModel.dailyHealth.collectAsState()
+    val waterToday by viewModel.waterToday.collectAsState()
+    val aiHint by viewModel.aiHint.collectAsState()
+    val aiThoughts by viewModel.aiThoughts.collectAsState()
     val context = LocalContext.current
 
-    var joinCode by remember { mutableStateOf("") }
-    var isJoining by remember { mutableStateOf(false) }
-
-    val sentiments = listOf(
-        "A hungry comrade is a weary comrade. Fuel up for excellence!",
-        "Sharing a meal is the ultimate bond. Enjoy your food together!",
-        "Good food is the foundation of genuine happiness and grades!",
-        "Every meal on a budget is a victory. Stay strong, comrade!",
-        "Fueling your dreams, one bite at a time. Eat well!"
-    )
+    var thoughtIndex by remember { mutableIntStateOf(0) }
     
-    var sentimentIndex by remember { mutableStateOf(0) }
-    
-    LaunchedEffect(Unit) {
+    LaunchedEffect(aiThoughts) {
+        if (thoughtIndex >= aiThoughts.size) {
+            thoughtIndex = 0
+        }
         while(true) {
-            delay(8000)
-            sentimentIndex = (sentimentIndex + 1) % sentiments.size
+            delay(10000)
+            if (aiThoughts.isNotEmpty()) {
+                thoughtIndex = (thoughtIndex + 1) % aiThoughts.size
+            }
         }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        // 1. Crystal Sentiment Box
-        item {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(15.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(15.dp)),
-                color = if (isDarkTheme) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ) {
-                Box(modifier = Modifier
-                    .fillMaxSize()
-                    .blur(if (android.os.Build.VERSION.SDK_INT >= 31) 25.dp else 0.dp)
-                )
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            item { Spacer(Modifier.height(16.dp)) }
+
+            // Chef AI Thoughts Header
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(15.dp)),
+                    color = if (isDarkTheme) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 ) {
-                    Box(modifier = Modifier.width(6.dp).height(40.dp).background(CyanAccent, RoundedCornerShape(3.dp)))
-                    Spacer(Modifier.width(16.dp))
-                    Crossfade(targetState = sentiments[sentimentIndex], animationSpec = tween(1000), label = "sentiment") { text ->
-                        Text(
-                            text = "\"$text\"",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontStyle = FontStyle.Italic,
-                                color = if (isDarkTheme) Color.White else Color.Black,
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Start
+                    Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.width(6.dp).height(40.dp).background(CyanAccent, RoundedCornerShape(3.dp)))
+                        Spacer(Modifier.width(16.dp))
+                        
+                        val currentThought = if (aiThoughts.isNotEmpty()) aiThoughts[thoughtIndex % aiThoughts.size] else "Welcome, Comrade!"
+                        
+                        Crossfade(targetState = currentThought, animationSpec = tween(1000), label = "sentiment") { text ->
+                            Text(
+                                text = "\"$text\"", 
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontStyle = FontStyle.Italic, 
+                                    color = if (isDarkTheme) Color.White else Color.Black, 
+                                    fontWeight = FontWeight.Medium
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
-        }
 
-        // 2. Group Sync Section (Dynamic)
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (groupCode.isBlank()) CyanAccent.copy(alpha = 0.15f) else Color.Transparent
-                ),
-                border = BorderStroke(1.dp, if (groupCode.isBlank()) CyanAccent else Color.Gray.copy(alpha = 0.3f))
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    if (groupCode.isBlank()) {
-                        Text("Sync with Group", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = CyanAccent)
-                        Text("Enter the 6-character code from the website to join your team.", fontSize = 12.sp, color = Color.Gray)
+            // Wellness Summary Row
+            item {
+                WellnessRow(dailyHealth, waterToday, isDarkTheme, onWaterClick = { viewModel.logWater() })
+            }
+
+            // Hero Section with Image Background
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                ) {
+                    AsyncImage(
+                        model = backgroundRes,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        alpha = 0.8f
+                    )
+                    
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
+
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "Number of people eating:", 
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            style = TextStyle(shadow = Shadow(color = Color.Black, blurRadius = 8f))
+                        )
                         Spacer(Modifier.height(12.dp))
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(
-                                value = joinCode,
-                                onValueChange = { if (it.length <= 6) joinCode = it.uppercase() },
-                                label = { Text("Group Code") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CyanAccent)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { viewModel.setGroupSize(groupSize - 1) },
+                                modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                            ) { 
+                                Text("-", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold) 
+                            }
+                            
+                            Text(
+                                text = groupSize.toString(), 
+                                style = MaterialTheme.typography.headlineLarge, 
+                                color = CyanAccent, 
+                                modifier = Modifier.padding(horizontal = 32.dp),
+                                fontWeight = FontWeight.Black
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Button(
-                                onClick = {
-                                    if (joinCode.length == 6) {
-                                        isJoining = true
-                                        viewModel.joinGroup(joinCode) { success, message ->
-                                            isJoining = false
-                                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                },
-                                enabled = joinCode.length == 6 && !isJoining,
-                                colors = ButtonDefaults.buttonColors(containerColor = CyanAccent, contentColor = Color.Black)
-                            ) {
-                                if (isJoining) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.Black)
-                                else Icon(Icons.Default.Refresh, contentDescription = null)
+                            
+                            IconButton(
+                                onClick = { viewModel.setGroupSize(groupSize + 1) },
+                                modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                            ) { 
+                                Icon(Icons.Default.Add, "Increase", tint = Color.White) 
                             }
                         }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Info, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Linked to: ", fontSize = 12.sp, color = Color.Gray)
-                            Text(groupName, fontWeight = FontWeight.Bold, color = CyanAccent)
-                            Spacer(Modifier.weight(1f))
-                            Text("CODE: $groupCode", fontSize = 10.sp, color = Color.Gray, fontStyle = FontStyle.Italic)
+                    }
+                }
+            }
+
+            // AI Suggestion Hint
+            aiHint?.let { hint ->
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CyanAccent.copy(alpha = 0.05f)),
+                        border = BorderStroke(1.dp, CyanAccent.copy(alpha = 0.2f))
+                    ) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(hint.icon, fontSize = 24.sp)
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = HtmlCompat.fromHtml(hint.text, HtmlCompat.FROM_HTML_MODE_LEGACY).toString(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isDarkTheme) Color.White.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.8f)
+                            )
                         }
                     }
                 }
             }
-        }
 
-        item {
-            Text(
-                "Number of people eating:", 
-                style = MaterialTheme.typography.headlineSmall, 
-                color = if (isDarkTheme) Color.White else Color.Black,
-                modifier = if (isDarkTheme) Modifier.shadow(2.dp, ambientColor = Color.Black) else Modifier
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-            ) {
-                IconButton(onClick = { viewModel.setGroupSize(groupSize - 1) }) {
-                    Text("-", color = if (isDarkTheme) Color.White else Color.Black, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                }
-                Text(
-                    text = groupSize.toString(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = if (isDarkTheme) Color.White else Color.Black,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                IconButton(onClick = { viewModel.setGroupSize(groupSize + 1) }) {
-                    Icon(Icons.Default.Add, contentDescription = "Increase", tint = if (isDarkTheme) Color.White else Color.Black)
-                }
-            }
-        }
-
-        item {
-            Text(
-                "Daily Plan", 
-                style = MaterialTheme.typography.headlineSmall, 
-                color = if (isDarkTheme) Color.White else Color.Black,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-        }
-
-        // Empty State Guidance
-        if (allBaseMeals.isEmpty() || allCombinations.isEmpty()) {
+            // Sync Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = CyanAccent.copy(alpha = 0.1f)),
-                    border = BorderStroke(1.dp, CyanAccent.copy(alpha = 0.3f))
+                    colors = CardDefaults.cardColors(containerColor = if (groupCode.isBlank()) CyanAccent.copy(alpha = 0.15f) else Color.Transparent),
+                    border = BorderStroke(1.dp, if (groupCode.isBlank()) CyanAccent else Color.Gray.copy(alpha = 0.3f))
                 ) {
-                    Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(48.dp))
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "No suggestions available yet.",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            "Add ingredients to your Inventory and create Combinations to start getting meal plans.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
+                    Column(Modifier.padding(16.dp)) {
+                        if (groupCode.isBlank()) {
+                            Text("Sync with Group", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = CyanAccent)
+                            Spacer(Modifier.height(12.dp))
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                var joinCode by remember { mutableStateOf("") }
+                                OutlinedTextField(
+                                    value = joinCode, 
+                                    onValueChange = { if (it.length <= 6) joinCode = it.uppercase() }, 
+                                    label = { Text("Group Code") }, 
+                                    modifier = Modifier.weight(1f), 
+                                    singleLine = true
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Button(
+                                    onClick = { viewModel.updateGroupCode(joinCode) }, 
+                                    colors = ButtonDefaults.buttonColors(containerColor = CyanAccent, contentColor = Color.Black)
+                                ) {
+                                    Icon(Icons.Default.Refresh, null)
+                                }
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Info, null, tint = CyanAccent, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Linked to: ", fontSize = 12.sp, color = Color.Gray)
+                                Text(groupName, fontWeight = FontWeight.Bold, color = CyanAccent)
+                                Spacer(Modifier.weight(1f))
+                                Text("CODE: $groupCode", fontSize = 10.sp, color = Color.Gray, fontStyle = FontStyle.Italic)
+                            }
+                        }
                     }
                 }
             }
-        } else {
-            listOf("Breakfast", "Lunch", "Dinner").forEach { time ->
+
+            item { Text("Daily Plan", style = MaterialTheme.typography.headlineSmall, color = if (isDarkTheme) Color.White else Color.Black, fontWeight = FontWeight.Bold) }
+
+            // Meals
+            if (allBaseMeals.isEmpty() || allCombinations.isEmpty()) {
                 item {
-                    MealSlotCard(
-                        time = time,
-                        combo = dailyPlan[time],
-                        groupSize = groupSize,
-                        viewModel = viewModel,
-                        allBaseMeals = allBaseMeals,
-                        isDarkTheme = isDarkTheme
-                    )
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = CyanAccent.copy(alpha = 0.1f)), border = BorderStroke(1.dp, CyanAccent.copy(alpha = 0.3f))) {
+                        Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Info, null, tint = CyanAccent, modifier = Modifier.size(48.dp))
+                            Spacer(Modifier.height(12.dp))
+                            Text("No suggestions available yet.", fontWeight = FontWeight.Bold)
+                            Text("Add ingredients and create Combinations to start.", textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+            } else {
+                listOf("Breakfast", "Lunch", "Dinner").forEach { time ->
+                    item {
+                        MealSlotCard(time, dailyPlan[time], groupSize, viewModel, allBaseMeals, isDarkTheme)
+                    }
                 }
             }
+            
+            item { Spacer(Modifier.height(32.dp)) }
         }
     }
 }
 
 @Composable
-fun MealSlotCard(
-    time: String,
-    combo: MealCombination?,
-    groupSize: Int,
-    viewModel: MealViewModel,
-    allBaseMeals: List<com.comradebite.data.BaseMeal>,
-    isDarkTheme: Boolean
-) {
-    val mealTime = when(time) {
-        "Breakfast" -> MealViewModel.BREAKFAST_TIME
-        "Lunch" -> MealViewModel.LUNCH_TIME
-        else -> MealViewModel.DINNER_TIME
+fun WellnessRow(health: DailyHealth, water: Int, isDarkTheme: Boolean, onWaterClick: () -> Unit) {
+    val targets = listOf("carb", "protein", "vegetable", "fruit")
+    val hitCount = targets.count { t -> health.groups.any { it == t || it == "mixed" } }
+    val balancePct = (hitCount.toFloat() / targets.size.toFloat() * 100).toInt()
+
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        WellnessCell(
+            modifier = Modifier.weight(1f),
+            value = if (health.kcal > 0) health.kcal.toString() else "—",
+            label = "🔥 kcal",
+            progress = if (health.kcal > 0) (health.kcal.toFloat() / 2000f).coerceAtMost(1f) else 0f,
+            color = if (health.kcal > 2200) Color.Red else if (health.kcal > 1600) Color(0xFF10B981) else Color(0xFF60A5FA),
+            isDarkTheme = isDarkTheme
+        )
+        WellnessCell(
+            modifier = Modifier.weight(1f),
+            value = if (health.groups.isNotEmpty()) "$balancePct%" else "—",
+            label = "🥗 balance",
+            progress = balancePct.toFloat() / 100f,
+            color = if (balancePct >= 75) Color(0xFF10B981) else if (balancePct >= 50) Color(0xFFF59E0B) else Color.Red,
+            isDarkTheme = isDarkTheme
+        )
+        WellnessCell(
+            modifier = Modifier.weight(1f).clickable { onWaterClick() },
+            value = "$water/8",
+            label = "💧 water",
+            progress = (water.toFloat() / 8f).coerceAtMost(1f),
+            color = if (water >= 8) Color(0xFF10B981) else CyanAccent,
+            isDarkTheme = isDarkTheme
+        )
     }
+}
+
+@Composable
+fun WellnessCell(modifier: Modifier, value: String, label: String, progress: Float, color: Color, isDarkTheme: Boolean) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = if (isDarkTheme) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
+        border = BorderStroke(0.5.dp, if(isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f))
+    ) {
+        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(value, fontWeight = FontWeight.Black, fontSize = 18.sp, color = color)
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = color,
+                trackColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(label.uppercase(), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isDarkTheme) Color.Gray else Color.DarkGray)
+        }
+    }
+}
+
+@Composable
+fun MealSlotCard(time: String, combo: MealCombination?, groupSize: Int, viewModel: MealViewModel, allBaseMeals: List<BaseMeal>, isDarkTheme: Boolean) {
+    val mealTime = when(time) { "Breakfast" -> MealViewModel.BREAKFAST_TIME; "Lunch" -> MealViewModel.LUNCH_TIME; else -> MealViewModel.DINNER_TIME }
     val timeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 
     Card(
@@ -261,30 +323,12 @@ fun MealSlotCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
-                    Text(
-                        text = time, 
-                        style = MaterialTheme.typography.headlineSmall, 
-                        color = if(time == "Breakfast") (if(isDarkTheme) Color.White else Color.DarkGray) else if(time == "Lunch") CyanAccent else Color(0xFFFACC15)
-                    )
-                    Text(
-                        text = "Scheduled: ${mealTime.format(timeFormatter)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+                    Text(text = time, style = MaterialTheme.typography.headlineSmall, color = if(time == "Breakfast") (if(isDarkTheme) Color.White else Color.DarkGray) else if(time == "Lunch") CyanAccent else Color(0xFFFACC15))
+                    Text(text = "Scheduled: ${mealTime.format(timeFormatter)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
                 if (combo?.isRare == true) {
-                    Surface(
-                        color = Color(0xFF8B5CF6).copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(4.dp),
-                        border = BorderStroke(1.dp, Color(0xFF8B5CF6))
-                    ) {
-                        Text(
-                            "RARE", 
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF8B5CF6),
-                            fontWeight = FontWeight.Bold
-                        )
+                    Surface(color = Color(0xFF8B5CF6).copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp), border = BorderStroke(1.dp, Color(0xFF8B5CF6))) {
+                        Text("RARE", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF8B5CF6), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -295,33 +339,35 @@ fun MealSlotCard(
                     Text(combo.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
                     if (combo.isSpecial) {
                         Spacer(Modifier.width(8.dp))
-                        Icon(Icons.Default.Star, contentDescription = "Special", tint = Color(0xFFFACC15), modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Star, "Special", tint = Color(0xFFFACC15), modifier = Modifier.size(20.dp))
                     }
                 }
                 
-                val share = viewModel.getIndividualShare(combo, allBaseMeals, groupSize) ?: 0.0
-                val total = share * groupSize
-
-                Column(
-                    modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()
-                ) {
+                val share = viewModel.getIndividualShare(combo, allBaseMeals, groupSize)
+                
+                Column(modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()) {
                     combo.baseNames.forEach { name ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 4.dp), thickness = 0.5.dp)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Group Total ($groupSize p)", fontWeight = FontWeight.Bold)
-                        Text("KSh ${total.toInt()}")
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Your Share", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        Text("KSh ${share.toInt()}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
+                    
+                    if (share != null && share > 0) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Group Total", fontWeight = FontWeight.Bold)
+                            Text("KSh ${(share * groupSize).toInt()}")
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Your Share", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Text("KSh ${share.toInt()}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
+                        }
+                    } else {
+                        Text("Price data not available for this combination.", style = MaterialTheme.typography.bodySmall, color = Color.Gray, fontStyle = FontStyle.Italic)
                     }
                 }
             } else {
-                Text("No unique suggestion available.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                Text("No suggestion available.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
             }
         }
     }
