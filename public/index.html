@@ -155,10 +155,10 @@
         <div class="auth-card">
             <div class="logo-text" style="font-size: 32px; margin-bottom: 20px;">Comrade<span class="logo-bite">Bite</span></div>
             <div id="auth-view">
-                <p id="auth-desc" style="color: #94a3b8; margin-bottom: 20px; font-size: 14px;">Welcome back, Comrade. Login to sync with your roommates.</p>
-                <input type="email" id="email" placeholder="Email">
-                <input type="password" id="password" placeholder="Password">
-                <button id="auth-btn" onclick="handleLogin()">Login</button>
+                <p id="auth-desc" style="color: #94a3b8; margin-bottom: 20px; font-size: 14px;">Enter your email and password to login now.</p>
+                <input type="email" id="email" placeholder="Email" autofocus oninput="updateAuthButton()">
+                <input type="password" id="password" placeholder="Password" oninput="updateAuthButton()">
+                <button id="auth-btn" onclick="handleLogin()">Waiting for credentials...</button>
                 <p style="margin-top: 20px; font-size: 14px; color: var(--cyan-accent); cursor: pointer;" onclick="window.location.href='register.html'">register instead if you don't have an account</p>
             </div>
             <p id="error" style="color: var(--danger); margin-top: 15px; font-size: 12px; font-weight: bold;"></p>
@@ -368,6 +368,7 @@
             }
             else { document.getElementById('auth-overlay').style.display='flex'; } 
         });
+        updateAuthButton();
 
         function loadUserState() {
             if (!user) return;
@@ -401,9 +402,40 @@
         }
 
         async function handleLogin() {
-            const e = document.getElementById('email').value, p = document.getElementById('password').value;
-            try { await auth.signInWithEmailAndPassword(e, p); }
-            catch(err) { document.getElementById('error').innerText = err.message; }
+            const e = document.getElementById('email').value.trim();
+            const p = document.getElementById('password').value;
+            document.getElementById('error').innerText = '';
+            if (!e || !p) {
+                document.getElementById('error').innerText = 'Please enter both email and password.';
+                return;
+            }
+            const btn = document.getElementById('auth-btn');
+            btn.disabled = true;
+            btn.innerText = 'Checking credentials...';
+            try {
+                await auth.signInWithEmailAndPassword(e, p);
+            } catch(err) {
+                document.getElementById('error').innerText = err.message;
+                btn.disabled = false;
+                btn.innerText = 'Login';
+            }
+        }
+
+        function updateAuthButton() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('auth-btn');
+            if (!email || !password) {
+                btn.disabled = true;
+                btn.innerText = 'Waiting for credentials...';
+                btn.style.opacity = '0.65';
+                btn.style.cursor = 'not-allowed';
+            } else {
+                btn.disabled = false;
+                btn.innerText = 'Login';
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            }
         }
 
         function loadUser() { 
