@@ -33,9 +33,17 @@ android {
         }
         create("v2") {
             dimension = "version"
-            applicationId = "com.comradebite.v2"
+            applicationId = "com.comradebite" // Match google-services.json
             versionName = "2.0"
             manifestPlaceholders["appName"] = "ComradeBite 2.0"
+        }
+    }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "ComradeBite-${variant.baseName}.apk"
         }
     }
 
@@ -64,6 +72,10 @@ android {
         }
     }
 }
+
+// Fix: Alias generic tasks to a default flavor to avoid build failures in scripts/CI
+tasks.maybeCreate("assembleDebugUnitTest").dependsOn("assembleV1DebugUnitTest")
+tasks.maybeCreate("testDebugUnitTest").dependsOn("testV1DebugUnitTest")
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")

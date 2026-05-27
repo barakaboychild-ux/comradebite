@@ -43,12 +43,18 @@ class MealViewModel(
     private var mealsListener: ValueEventListener? = null
     private var inventoryListener: ValueEventListener? = null
     private var userGroupsListener: ValueEventListener? = null
+    private var userProfileListener: ValueEventListener? = null
     private var currentGroupNode: String? = null
 
     private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
         val user = firebaseAuth.currentUser
-        if (user != null) observeUserGroups(user.uid)
-        else _userGroups.value = emptyList()
+        if (user != null) {
+            observeUserGroups(user.uid)
+            observeUserProfile(user.uid)
+        } else {
+            _userGroups.value = emptyList()
+            _userName.value = "Comrade"
+        }
     }
 
     companion object {
@@ -70,6 +76,9 @@ class MealViewModel(
         val LUNCH_TIME = LocalTime.of(13, 0)
         val DINNER_TIME = LocalTime.of(20, 0)
     }
+
+    private val _userName = MutableStateFlow("Comrade")
+    val userName: StateFlow<String> = _userName
 
     private val _groupCode = MutableStateFlow(prefs.getString("group_code", "") ?: "")
     val groupCode: StateFlow<String> = _groupCode
@@ -485,6 +494,16 @@ class MealViewModel(
         })
     }
 
+    private fun observeUserProfile(uid: String) {
+        userProfileListener = firebase.getReference("users").child(uid).child("profile").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                val name = s.child("name").getValue(String::class.java) ?: "Comrade"
+                _userName.value = name
+            }
+            override fun onCancelled(e: DatabaseError) {}
+        })
+    }
+
     override fun onCleared() {
         super.onCleared()
         auth.removeAuthStateListener(authStateListener)
@@ -493,8 +512,9 @@ class MealViewModel(
             inventoryListener?.let { firebase.getReference("groups").child(code).child("inventory").removeEventListener(it) }
         }
         val user = auth.currentUser
-        if (user != null && userGroupsListener != null) {
-            firebase.getReference("users").child(user.uid).child("groups").removeEventListener(userGroupsListener!!)
+        if (user != null) {
+            userGroupsListener?.let { firebase.getReference("users").child(user.uid).child("groups").removeEventListener(it) }
+            userProfileListener?.let { firebase.getReference("users").child(user.uid).child("profile").removeEventListener(it) }
         }
     }
 }

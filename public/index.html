@@ -83,7 +83,6 @@
         input:checked+.slider:before { transform: translateX(22px); }
         .bottom-tag { position: absolute; bottom: 30px; left: 25px; font-size: 11px; color: var(--text-muted); letter-spacing: 1px; }
 
-        .nutri-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; margin-bottom: 4px; }
         .nutri-pill { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--slate-700); color: var(--text-muted); }
         .nutri-pill.active { background: rgba(34,211,238,0.18); color: var(--cyan-accent); border: 1px solid rgba(34,211,238,0.3); }
         .nutri-pill.protein { color: #f97316; background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.25); }
@@ -156,11 +155,11 @@
         <div class="auth-card">
             <div class="logo-text" style="font-size: 32px; margin-bottom: 20px;">Comrade<span class="logo-bite">Bite</span></div>
             <div id="auth-view">
-                <p id="auth-desc" style="color: #94a3b8; margin-bottom: 20px; font-size: 14px;">Join to start planning meals with your roommates.</p>
+                <p id="auth-desc" style="color: #94a3b8; margin-bottom: 20px; font-size: 14px;">Welcome back, Comrade. Login to sync with your roommates.</p>
                 <input type="email" id="email" placeholder="Email">
                 <input type="password" id="password" placeholder="Password">
-                <button id="auth-btn" onclick="handleAuth()">Register</button>
-                <p style="margin-top: 20px; font-size: 14px; color: var(--cyan-accent); cursor: pointer;" onclick="toggleAuth()" id="auth-toggle">login instead if you have an account</p>
+                <button id="auth-btn" onclick="handleLogin()">Login</button>
+                <p style="margin-top: 20px; font-size: 14px; color: var(--cyan-accent); cursor: pointer;" onclick="window.location.href='register.html'">register instead if you don't have an account</p>
             </div>
             <p id="error" style="color: var(--danger); margin-top: 15px; font-size: 12px; font-weight: bold;"></p>
         </div>
@@ -169,7 +168,9 @@
     <div class="drawer-overlay" id="overlay" onclick="toggleDrawer()"></div>
 
     <div class="drawer" id="drawer">
-        <div class="logo-text" style="font-size:32px; margin-bottom:30px;">Comrade<span class="logo-bite">Bite</span></div>
+        <div class="logo-text" style="font-size:32px; margin-bottom:10px;">Comrade<span class="logo-bite">Bite</span></div>
+        <div id="user-display-name" style="color: var(--cyan-accent); font-weight: 800; font-size: 14px; margin-bottom: 30px; opacity: 0.8;">Welcome, Comrade</div>
+
         <div class="nav-item active" id="nav-dashboard"  onclick="switchSection('dashboard')">🏠 Home Dashboard</div>
         <div class="nav-item"        id="nav-group"      onclick="switchSection('group')">👥 Group Management</div>
         <div class="nav-item"        id="nav-items"      onclick="switchSection('items')">📦 Meal Inventory</div>
@@ -350,25 +351,58 @@
         firebase.initializeApp(cfg);
         const db = firebase.database(), auth = firebase.auth();
         let user = null, curCode = "", data = { inventory: {}, meals: {}, groupSize: 1 };
-        let isLogin = false;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        if(urlParams.get('mode') === 'login') toggleAuth();
 
         auth.onAuthStateChanged(u => { 
-            if(u) { user = u; document.getElementById('auth-overlay').style.display='none'; loadUser(); } 
+            if(u) {
+                user = u;
+                document.getElementById('auth-overlay').style.display='none';
+
+                // Display user name in drawer
+                db.ref(`users/${user.uid}/profile/name`).once('value', s => {
+                    const name = s.val() || user.displayName || "Comrade";
+                    document.getElementById('user-display-name').innerText = "Welcome, " + name;
+                });
+
+                loadUser();
+                loadUserState();
+            }
             else { document.getElementById('auth-overlay').style.display='flex'; } 
         });
 
-        function toggleAuth() { 
-            isLogin = !isLogin; 
-            document.getElementById('auth-btn').innerText = isLogin ? "Login" : "Register"; 
-            document.getElementById('auth-desc').innerText = isLogin ? "Welcome back, Comrade." : "Join to start planning meals."; 
-            document.getElementById('auth-toggle').innerText = isLogin ? "register instead if you don't have an account" : "login instead if you have an account"; 
+        function loadUserState() {
+            if (!user) return;
+            db.ref(`users/${user.uid}/state`).once('value', snap => {
+                const state = snap.val();
+                if (!state) return;
+                if (state.currentDayPlan) currentDayPlan = state.currentDayPlan;
+                if (state.eatenTodayIngredients) eatenTodayIngredients = state.eatenTodayIngredients;
+                if (state.ai) ai = state.ai;
+                const theme = state.theme || localStorage.getItem('cb_theme');
+                if (theme) {
+                    document.getElementById('theme-toggle').checked = theme === 'light';
+                    document.body.setAttribute('data-theme', theme);
+                    localStorage.setItem('cb_theme', theme);
+                }
+                localStorage.setItem('cb_v6_plan', JSON.stringify(currentDayPlan));
+                localStorage.setItem('cb_v6_eaten_today', JSON.stringify(eatenTodayIngredients));
+                localStorage.setItem('cb_ai_v6', JSON.stringify(ai));
+                render();
+            });
         }
-        async function handleAuth() {
+
+        function saveUserState() {
+            if (!user) return;
+            db.ref(`users/${user.uid}/state`).set({
+                currentDayPlan,
+                eatenTodayIngredients,
+                ai,
+                theme: document.getElementById('theme-toggle')?.checked ? 'light' : 'dark'
+            });
+        }
+
+        async function handleLogin() {
             const e = document.getElementById('email').value, p = document.getElementById('password').value;
-            try { if(isLogin) await auth.signInWithEmailAndPassword(e, p); else await auth.createUserWithEmailAndPassword(e, p); }
+            try { await auth.signInWithEmailAndPassword(e, p); }
             catch(err) { document.getElementById('error').innerText = err.message; }
         }
 
@@ -430,7 +464,21 @@
             history: [], commonMeals: {}, fruitVegStreak: 0, fruitVegMiss: 0,
             waterToday: 0, waterDate: null, lastWaterRemind: null
         }));
-        function saveAI() { localStorage.setItem('cb_ai_v6', JSON.stringify(ai)); }
+        function saveAI() { 
+            localStorage.setItem('cb_ai_v6', JSON.stringify(ai));
+            if (user) saveUserState();
+        }
+
+        function savePlanState() {
+            localStorage.setItem('cb_v6_plan', JSON.stringify(currentDayPlan));
+            if (user) saveUserState();
+        }
+
+        function setPlan(type, id) {
+            currentDayPlan[type] = id;
+            savePlanState();
+            render();
+        }
 
         // AI Helpers
         function detectGroups(names) {
@@ -637,7 +685,7 @@
                     const sorted = combinations.filter(c => c.targetTime === time);
                     if (sorted.length > 0) currentDayPlan[time] = sorted[Math.floor(Math.random()*sorted.length)].id;
                 });
-                localStorage.setItem('cb_v6_plan', JSON.stringify(currentDayPlan));
+                savePlanState();
             }
             ['breakfast-slot','lunch-slot','dinner-slot'].forEach((divId, i) => renderSlotUI(divId, ['Breakfast','Lunch','Dinner'][i]));
 
@@ -792,7 +840,7 @@
             }).filter(x => (x.cost/globalPeople) <= budget).map(x => `
                 <div style="background:var(--bg-card); padding:13px; border-radius:12px; border:1px solid var(--glass-border); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
                     <div><b>${x.c.name}</b><br><small style="color:var(--cyan-accent);">KSh ${(x.cost/globalPeople).toFixed(0)} / person</small></div>
-                    <button class="outline" style="padding:6px 12px;" onclick="currentDayPlan['${x.c.targetTime}']='${x.c.id}'; localStorage.setItem('cb_v6_plan', JSON.stringify(currentDayPlan)); render();">Select</button>
+                    <button class="outline" style="padding:6px 12px;" onclick="setPlan('${x.c.targetTime}','${x.c.id}')">Select</button>
                 </div>`).join('');
             el.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">No matches for this budget.</div>';
         }
@@ -814,10 +862,12 @@
             localStorage.setItem('cb_v6_eaten_today', JSON.stringify(eatenTodayIngredients));
             
             ai.history.push({ date: new Date().toLocaleDateString(), meal: combo.name });
-            saveAI(); showToast(`✅ "${combo.name}" marked as eaten!`, 'success'); render();
+            saveAI();
+            saveUserState();
+            showToast(`✅ "${combo.name}" marked as eaten!`, 'success'); render();
         }
-        function resetDay() { eatenTodayIngredients = []; currentDayPlan = {}; localStorage.setItem('cb_v6_eaten_today', '[]'); localStorage.setItem('cb_v6_plan', '{}'); render(); }
-        function refreshSuggestions() { currentDayPlan = {}; localStorage.setItem('cb_v6_plan', '{}'); render(); }
+        function resetDay() { eatenTodayIngredients = []; currentDayPlan = {}; localStorage.setItem('cb_v6_eaten_today', '[]'); localStorage.setItem('cb_v6_plan', '{}'); saveUserState(); render(); }
+        function refreshSuggestions() { currentDayPlan = {}; localStorage.setItem('cb_v6_plan', '{}'); saveUserState(); render(); }
 
         // ═══════════════════════════════════════════════════════
         //  UI HELPERS & CHAT
@@ -826,6 +876,7 @@
             const light = document.getElementById('theme-toggle').checked;
             document.body.setAttribute('data-theme', light ? 'light' : 'dark');
             localStorage.setItem('cb_theme', light ? 'light' : 'dark');
+            saveUserState();
         }
         function switchSection(id) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));

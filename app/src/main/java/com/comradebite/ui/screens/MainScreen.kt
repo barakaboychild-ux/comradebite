@@ -44,6 +44,7 @@ fun MainScreen(viewModel: MealViewModel) {
     val scope = rememberCoroutineScope()
     var currentScreen by remember { mutableStateOf("Dashboard") }
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+    val userName by viewModel.userName.collectAsState()
     
     val auth = remember { FirebaseAuth.getInstance() }
     var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
@@ -87,11 +88,21 @@ fun MainScreen(viewModel: MealViewModel) {
                                 withStyle(style = SpanStyle(fontWeight = FontWeight.ExtraBold, color = if (isDarkTheme) Color.White else Color.Black)) { append("Comrade") }
                                 withStyle(style = SpanStyle(fontWeight = FontWeight.ExtraBold, color = CyanAccent)) { append("Bite") }
                             },
-                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
+                            modifier = Modifier.padding(horizontal = 28.dp),
                             style = MaterialTheme.typography.headlineLarge.copy(fontSize = 32.sp)
                         )
                         
-                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            text = if (isLoggedIn) "Welcome, $userName" else "Welcome, Comrade",
+                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                color = CyanAccent,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                        )
+                        
+                        Spacer(Modifier.height(16.dp))
                         
                         val menuItems = listOf(
                             "Home Dashboard" to "Dashboard",

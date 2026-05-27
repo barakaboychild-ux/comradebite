@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "groups": {
+      "$groupCode": {
+        ".read": "auth != null && (data.child('members').child(auth.uid).exists() || !data.exists())",
+        ".write": "auth != null && (data.child('members').child(auth.uid).exists() || !data.exists())"
+      }
+    }
+  }
+}
