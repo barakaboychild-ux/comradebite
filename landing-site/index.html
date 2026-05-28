@@ -63,8 +63,10 @@
 
     <div class="top-bar">
         <a href="#" class="logo">Comrade<span>Bite</span></a>
-        <!-- Login button redirects IMMEDIATELY to ComradeBite functional site -->
-        <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/?mode=login'" style="background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">Login</button>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/login.html'" style="background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s;">Login</button>
+            <button onclick="window.location.href='https://comradebite-c0265c98.firebaseapp.com/register.html'" style="background: linear-gradient(135deg, var(--accent), #38bdf8); color: #020617; border: none; padding: 9px 20px; border-radius: 10px; font-weight: 800; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(34, 211, 238, 0.2);">Register</button>
+        </div>
     </div>
 
     <div class="container">

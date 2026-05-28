@@ -146,25 +146,9 @@
         @keyframes pulseGlow { 0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,0.4); } 50% { box-shadow: 0 6px 30px rgba(34,211,238,0.5); } }
         @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-        /* Auth styling */
-        #auth-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.98); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(10px); }
-        .auth-card { background: #1e293b; padding: 40px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--glass-border); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
-    <div id="auth-overlay">
-        <div class="auth-card">
-            <div class="logo-text" style="font-size: 32px; margin-bottom: 20px;">Comrade<span class="logo-bite">Bite</span></div>
-            <div id="auth-view">
-                <p id="auth-desc" style="color: #94a3b8; margin-bottom: 20px; font-size: 14px;">Enter your email and password to login now.</p>
-                <input type="email" id="email" placeholder="Email" autofocus>
-                <input type="password" id="password" placeholder="Password">
-                <button id="auth-btn" onclick="handleLogin()">Login</button>
-                <p style="margin-top: 20px; font-size: 14px; color: var(--cyan-accent); cursor: pointer;" onclick="window.location.href='register.html'">register instead if you don't have an account</p>
-            </div>
-            <p id="error" style="color: var(--danger); margin-top: 15px; font-size: 12px; font-weight: bold;"></p>
-        </div>
-    </div>
 
     <div class="drawer-overlay" id="overlay" onclick="toggleDrawer()"></div>
 
@@ -359,7 +343,6 @@
                 // REAL-TIME CHECK: Ensure credentials exist in the Database before entering
                 db.ref(`users/${user.uid}/profile`).on('value', s => {
                     if (s.exists()) {
-                        document.getElementById('auth-overlay').style.display='none';
                         const name = s.val().name || user.displayName || "Comrade";
                         document.getElementById('user-display-name').innerText = "Welcome, " + name;
                         loadUser();
@@ -367,14 +350,12 @@
                     } else {
                         // Data not found in database - block entry
                         auth.signOut();
-                        document.getElementById('error').innerText = 'Credentials not found in Database. Please register first.';
-                        document.getElementById('auth-btn').disabled = false;
-                        document.getElementById('auth-btn').innerText = 'Login';
+                        window.location.href = 'login.html';
                     }
                 });
             }
             else {
-                document.getElementById('auth-overlay').style.display='flex';
+                window.location.href = 'login.html';
             }
         });
 
@@ -407,36 +388,6 @@
                 ai,
                 theme: document.getElementById('theme-toggle')?.checked ? 'light' : 'dark'
             });
-        }
-
-        async function handleLogin() {
-            const e = document.getElementById('email').value.trim();
-            const p = document.getElementById('password').value;
-            const errorEl = document.getElementById('error');
-            const btn = document.getElementById('auth-btn');
-
-            errorEl.innerText = '';
-            if (!e || !p) {
-                errorEl.innerText = 'Please enter both email and password.';
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerText = 'Verifying credentials...';
-
-            try {
-                // 1. Verify Auth Credentials
-                const result = await auth.signInWithEmailAndPassword(e, p);
-
-                // 2. The onAuthStateChanged listener above will now perform
-                // the real-time check in the database to finalize the login.
-                btn.innerText = 'Checking profile...';
-
-            } catch(err) {
-                errorEl.innerText = "Login failed: " + err.message;
-                btn.disabled = false;
-                btn.innerText = 'Login';
-            }
         }
 
         function loadUser() { 
