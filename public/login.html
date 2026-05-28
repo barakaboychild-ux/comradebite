@@ -8,23 +8,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Montserrat:wght@900&display=swap" rel="stylesheet">
-    <style>
-        :root { --bg: #080c14; --card: rgba(15, 23, 42, 0.95); --text: #f8fafc; --muted: #94a3b8; --accent: #22d3ee; --accent-2: #10b981; --border: rgba(255,255,255,0.12); --danger: #f43f5e; }
-        * { box-sizing: border-box; }
-        body { margin: 0; min-height: 100vh; font-family: 'Inter', sans-serif; color: var(--text); background: radial-gradient(circle at top, rgba(34,211,238,0.12), transparent 24%), linear-gradient(180deg, rgba(8,12,20,0.96), rgba(8,12,20,0.96)), url('https://images.unsplash.com/photo-1528756514091-dee0f8d6e11c?auto=format&fit=crop&q=80&w=1600'); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .card { width: 100%; max-width: 440px; background: var(--card); border: 1px solid var(--border); border-radius: 28px; padding: 34px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); backdrop-filter: blur(12px); }
-        .brand { font-family: 'Montserrat', sans-serif; font-size: 32px; font-weight: 900; margin: 0 0 18px; letter-spacing: -0.04em; }
-        .brand span { color: var(--accent); }
-        p.lead { margin: 0 0 24px; color: var(--muted); line-height: 1.7; }
-        label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; margin-top: 18px; }
-        input { width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); outline: none; font-size: 15px; }
-        input::placeholder { color: rgba(255,255,255,0.55); }
-        .button { width: 100%; margin-top: 26px; padding: 16px 18px; border: none; border-radius: 16px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #000; font-weight: 800; font-size: 15px; cursor: pointer; }
-        .button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .link-row { margin-top: 18px; font-size: 14px; color: var(--muted); text-align: center; }
-        .link-row a { color: var(--accent); text-decoration: none; }
-        .error { margin-top: 16px; color: var(--danger); font-size: 13px; min-height: 18px; text-align: center; }
-    </style>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' https://www.gstatic.com https://www.googleapis.com 'unsafe-inline'; img-src 'self' data:;">
+<link rel="stylesheet" href="css/main.css">
 </head>
 <body>
     <div class="card">
