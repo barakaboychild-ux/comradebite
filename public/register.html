@@ -20,6 +20,7 @@
         input { width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); outline: none; font-size: 15px; }
         input::placeholder { color: rgba(255,255,255,0.55); }
         .button { width: 100%; margin-top: 26px; padding: 16px 18px; border: none; border-radius: 16px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #000; font-weight: 800; font-size: 15px; cursor: pointer; }
+        .button:disabled { opacity: 0.5; cursor: not-allowed; }
         .link-row { margin-top: 18px; font-size: 14px; color: var(--muted); text-align: center; }
         .link-row a { color: var(--accent); text-decoration: none; }
         .error { margin-top: 16px; color: var(--danger); font-size: 13px; min-height: 18px; text-align: center; }
@@ -28,7 +29,7 @@
 <body>
     <div class="card">
         <div class="brand">Comrade<span>Bite</span></div>
-        <p class="lead">Create your account to join the ComradeBite community. Enter your name, email, and secure password.</p>
+        <p class="lead">Create your account to join the community.</p>
         <label for="name">Full Name</label>
         <input id="name" type="text" placeholder="Your full name">
         <label for="email">Email</label>
@@ -37,9 +38,9 @@
         <input id="password" type="password" placeholder="Create a strong password">
         <label for="confirm-password">Confirm Password</label>
         <input id="confirm-password" type="password" placeholder="Repeat your password">
-        <button class="button" onclick="registerUser()">Create Account</button>
+        <button class="button" id="reg-btn" onclick="registerUser()">Create Account</button>
         <div class="error" id="error"></div>
-        <div class="link-row">Already have an account? <a href="index.html?mode=login">Login here</a></div>
+        <div class="link-row">Already have an account? <a href="index.html">Login here</a></div>
     </div>
     <script>
         const cfg = { apiKey: "AIzaSyDzzNgX8oEq_pmLJwUk1MJ3404eaDl7Ge4", authDomain: "comradebite-c0265c98.firebaseapp.com", databaseURL: "https://comradebite-c0265c98-default-rtdb.firebaseio.com", projectId: "comradebite-c0265c98" };
@@ -53,6 +54,7 @@
             const password = document.getElementById('password').value;
             const confirm = document.getElementById('confirm-password').value;
             const errorEl = document.getElementById('error');
+            const btn = document.getElementById('reg-btn');
             errorEl.innerText = '';
 
             if (!name || !email || !password || !confirm) {
@@ -63,20 +65,28 @@
                 errorEl.innerText = 'Passwords do not match.';
                 return;
             }
-            if (password.length < 6) {
-                errorEl.innerText = 'Password must be at least 6 characters.';
-                return;
-            }
+
+            btn.disabled = true;
+            btn.innerText = 'Registering...';
 
             try {
+                // 1. Create the Auth Account
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const user = userCredential.user;
-                await user.updateProfile({ displayName: name });
-                // Saving to profile/name to match the other pages and the Android app
-                await db.ref(`users/${user.uid}/profile`).set({ name, email, createdAt: Date.now() });
+
+                // 2. Capture details into Database immediately
+                await db.ref(`users/${user.uid}/profile`).set({
+                    name: name,
+                    email: email,
+                    createdAt: Date.now()
+                });
+
+                // Redirect to login/home
                 window.location.href = 'index.html';
             } catch (err) {
                 errorEl.innerText = err.message;
+                btn.disabled = false;
+                btn.innerText = 'Create Account';
             }
         }
     </script>
